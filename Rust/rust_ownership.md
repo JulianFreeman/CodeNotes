@@ -131,7 +131,7 @@ fn plus_one(x: i32) -> i32 {
 }
 ```
 
-变量存在于 **栈帧** 中。栈帧是一种在单一作用域（比如函数）下从变量到值得映射。举例如下：
+变量存在于 **栈帧** 中。栈帧是一种在单一作用域（比如函数）下从变量到值的映射。举例如下：
 
 - L1 位置下，`main` 的栈帧中保存了 `n = 5`。
 - L2 位置下，`plus_one` 的栈帧中保存了 `x = 5`。
@@ -196,7 +196,142 @@ Rust 不允许程序手动释放内存。这种政策就避免了上述未定义
 
 ## Box 的所有者负责释放内存
 
+相反，Rust 会 *自动* 释放 box 的堆内存。这是一个关于 Rust 释放 box 的 *几乎* 准确的描述：
 
+> **Box 的释放原则（几乎准确）**：如果一个变量绑定了一个 box，当 Rust 释放该变量所在的栈帧时，也会一同释放这个 box 的堆内存。
+
+举个例子，我们来跟踪一下下面这个程序是如何分配和释放 box 的：
+
+```rust
+fn main() {
+    let a_num = 4; // L1
+    make_and_drop(); // L3
+}
+
+fn make_and_drop() {
+    let a_box = Box::new(5); // L2
+}
+```
+
+在 L1，调用 `make_and_drop` 之前，内存的状态就只有 `main` 的栈帧。在 L2，调用 `make_and_drop` 的时候，`a_box` 指向了堆上的 `5`。当 `make_and_drop` 结束的时候，Rust 释放它的栈帧。因为 `make_and_drop` 保存了变量 `a_box`，因此 Rust 也释放了 `a_box` 所指向的堆数据。因此到 L3 的时候，堆上又是空的了。
+
+Box 的堆内存管理一切正常。但是如果我们使坏怎么办？回到之前的一个例子上，如果我们把一个 box 绑定到两个变量会发生什么？
+
+```rust
+let a = Box::new([0; 1_000_000]);
+let b = a;
+```
+
+现在堆上的数组被同时绑定到了 `a` 和 `b` 上。根据我们“几乎准确”的原则，Rust 会尝试释放 box 的堆内存 *两次*。这也是一个未定义行为！
+
+为了避免这个问题，所有权终于登场了。当 `a` 绑定到 `Box::new([0; 1_000_000])` 的时候，我们称 `a` **拥有** 这个 box。语句 `let b = a` 把这个 box 的所有权从 `a` **转移** 给了 `b`。根据这些说明，我们可以更加准确地描述 Rust 释放 box 的政策：
+
+> **Box 的释放原则（完全准确）**：如果一个变量拥有一个 box，当 Rust 释放这个变量的栈帧时，也会一同释放这个 box 的堆内存。
+
+在上述例子中，`b` 拥有数组的 box，因此当这个作用域结束时，Rust 只会因为 `b` 而释放这块内存一次。
+
+## 集合也使用 Box
+
+Rust 的数据结构[^1]，比如 `Vec`、`String`、`HashMap` 等，使用 Box 来保存可变数量的值。比如说，下面这段程序可以创建、移动、修改一个字符串：
+
+```rust
+fn main() {
+    let first = String::from("Ferris"); // L1
+    let full = add_suffix(first); // L4
+    println!("{full}");
+}
+
+fn add_suffix(mut name: String) -> String {
+    // L2
+    name.push_str(" Jr."); // L3
+    name
+}
+```
+
+这段程序涉及到很多，所以跟上了：
+
+1. 在 L1，堆上分配了字符串 `"Ferris"`，由 `first` 拥有。
+2. 在 L2，函数 `add_suffix(first)` 被调用了。这导致字符串的所有权从 `first` 转移到了 `name`。字符串本身的数据没有被拷贝，但是指向这个字符串的指针被拷贝了。
+3. 在 L3，函数 `name.push_str(" Jr.")` 调整了字符串在堆上的大小。这里包含了三件事。一，分配一块新的更大的内存；二，把 `"Ferris Jr."` 写入这块内存；三，释放原来的内存。现在 `first` 指向了一个已经被释放的内存。
+4. 在 L4，栈帧 `add_suffix` 没了，函数返回了 `name`，把字符串的所有权转交给了 `full`。
+
+## 变量在被转移后就不能使用了
+
+上面的字符串程序描述了一个关于所有权的重要安全原则。想象一下如果在调用 `add_suffix` 之后 `first` 在 `main` 函数里又被使用了，会怎样。我们可以模拟一下这个程序，看看会导致什么未定义行为：
+
+```rust
+fn main() {
+    let first = String::from("Ferris");
+    let full = add_suffix(first);
+    println!("{full}, originally {first}"); // L1 // first is now used here
+}
+
+fn add_suffix(mut name: String) -> String {
+    name.push_str(" Jr.");
+    name
+}
+```
+
+> 上述代码不可编译
+
+在调用 `add_suffix` 之后，`first` 指向了一块被释放的内存。在 `println!` 中试图读取 `first` 是一种对内存安全的侵犯（未定义行为）。请记住：`first` 是一个指向被释放内存的指针，这不是什么问题，问题在于当它变成非法指针之后我们依旧尝试 *使用* 它。
+
+好在，Rust 会拒绝编译这段程序，并给出如下错误：
+
+```text
+error[E0382]: borrow of moved value: `first`
+ --> test.rs:4:35
+  |
+2 |     let first = String::from("Ferris");
+  |         ----- move occurs because `first` has type `String`, which does not implement the `Copy` trait
+3 |     let full = add_suffix(first);
+  |                           ----- value moved here
+4 |     println!("{full}, originally {first}"); // first is now used here
+  |                                   ^^^^^ value borrowed here after move
+```
+
+让我们细看看这个错误。Rust 说在第 3 行调用 `add_suffix(first)` 的时候，`first` 已经被转移了。这个错误说 `first` 之所以被转移是因为它的类型是 `String`，没有实现 `Copy`。我们稍后会谈论这个 `Copy`，简单来说，你只需要知道，如果把这里的 `String` 换成 `i32` 就不会报这个错误了。最后，这个错误说我们在 `first` 被转移（其实是“借用”，我们会在下一部分讨论这个）后还使用了它。
+
+所以，如果你转移了一个变量，Rust 就不让你用它了。更准确来说，编译器遵守如下原则：
+
+> **堆数据转移原则**：如果一个变量 `x` 把堆数据的所有权转移给了另一个变量 `y`，那转移之后 `x` 就不能被使用了。
+
+现在你应该明白所有权、转移和安全之间的关系了。转移堆数据的所有权避免了读取被释放内存的这种未定义行为。
+
+## 不想转移就拷贝
+
+其中一种避免转移数据的方法是使用 `.clone()` 方法来拷贝数据。比如说，我们可以用拷贝来修复上一个程序的安全问题：
+
+```rust
+fn main() {
+    let first = String::from("Ferris");
+    let first_clone = first.clone(); // L1
+    let full = add_suffix(first_clone); // L2
+    println!("{full}, originally {first}");
+}
+
+fn add_suffix(mut name: String) -> String {
+    name.push_str(" Jr.");
+    name
+}
+```
+
+在 L1，`first_clone` 不只是浅拷贝了 `first` 的指针，而是深拷贝了字符串的数据到一块新的堆内存上。因此在 L2，当 `first_clone` 因为调用 `add_suffix` 而被转移并失效之后，原来的 `first` 并没有变。继续使用 `first` 是安全的。
+
+## 总结
+
+所有权主要是一种堆管理机制。[^2]
+
+- 所有的堆数据只能被一个变量拥有。
+- 当一块堆数据的所有者离开作用域后，这块堆数据就被释放了。
+- 所有权可以通过转移而改变，比如在变量赋值或者函数调用时。
+- 堆数据只能被它的当前所有者拥有，上一任所有者不行。
+
+我们不仅着重介绍了 Rust 的安全机制是 *如何* 工作的，也解释了 *为什么* 它能避免未定义行为。如果你的 Rust 编译器报了一个错，而你不理解为什么会有这个错的话，你会很容易不知所措。上面这些基本概念应该可以帮助你理解 Rust 的错误信息。它们也应该能帮助你设计更符合 Rust 理念的 API。
+
+[^1]: 这些数据结构并不是使用字面上的 `Box` 类型。比如 `String` 是用 `Vec` 实现的，而 `Vec` 是用 `RawVec` 实现的，而不是 `Box`。但是像 `RawVec` 这种类型也与 box 类似，它们也在堆上拥有内存。
+
+[^2]: 从另一方面说，所有权是 *指针* 管理的机制。但是我们还没有讲到如何在堆之外的地方获取指针。我们会在下一部分讨论。
 
 
 
