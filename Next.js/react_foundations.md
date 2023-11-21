@@ -38,7 +38,7 @@ Next.js 是一个灵活的 **React 框架**，提供了许多构建模块来创�
 
 这里的用户界面，指的是用户在屏幕上看到的并且可以交互的各种元素。
 
-![user-interface](images/user-interface.avif)
+![user-interface](react_foundations_images/user-interface.avif)
 
 这里的库，指的是 React 提供了很多很有用的功能来构建 UI，但是由开发者自己决定在哪里使用这些功能。
 
@@ -52,7 +52,7 @@ Next.js 是一个 React **框架**，提供了创建网页应用的构建模块�
 
 这里的框架，指的是 Next.js 负责处理 React 需要的工具配置，也提供了一些额外的工具，功能和优化。
 
-![next-app](images/next-app.avif)
+![next-app](react_foundations_images/next-app.avif)
 
 你可以使用 React 来构建你的 UI，然后逐渐用 Next.js 的功能来解决常见的应用需求，比如路由、数据抓取、整合等，一步步提升开发体验和用户体验。
 
@@ -66,7 +66,7 @@ Next.js 是一个 React **框架**，提供了创建网页应用的构建模块�
 
 当用户访问一个网页时，服务器会返回一个 HTML 文件给浏览器，这个文件可能像如下的样子：
 
-![html-to-dom](images/html-to-dom.avif)
+![html-to-dom](react_foundations_images/html-to-dom.avif)
 
 然后浏览器读取这个 HTML 文件并构建了一个文件对象模型（DOM）。
 
@@ -74,7 +74,7 @@ Next.js 是一个 React **框架**，提供了创建网页应用的构建模块�
 
 DOM 是一种对 HTML 元素的呈现，这种呈现是基于对象的。它是代码和用户界面之间的桥梁，有树状结构并包含一些父子关系。
 
-![dom-to-ui](images/dom-to-ui.avif)
+![dom-to-ui](react_foundations_images/dom-to-ui.avif)
 
 你可以使用 DOM 方法和一门编程语言，比如 JavaScript，来监听用户事件，[修改 DOM 结构](https://developer.mozilla.org/docs/Learn/JavaScript/Client-side_web_APIs/Manipulating_documents)（选择、添加、更新、删除用户界面上的特定元素）。修改 DOM 不仅是针对特定的元素，也可以修改元素的样式和内容。
 
@@ -163,7 +163,7 @@ DOM 是一种对 HTML 元素的呈现，这种呈现是基于对象的。它是�
 
 如果你在[浏览器开发工具](https://developer.chrome.com/docs/devtools/overview/)中查看 DOM 元素，你会发现 DOM 中包含一个 `<h1>` 元素。页面的 DOM 结构和我们的源码不一致。
 
-![source-code](images/source-code.avif)
+![source-code](react_foundations_images/source-code.avif)
 
 这是因为 HTML 呈现的是 **原始的页面内容**，而 DOM 呈现的是 **更新后的页面内容**，我们刚刚用 JavaScript 更新的。
 
@@ -240,7 +240,7 @@ DOM 是一种对 HTML 元素的呈现，这种呈现是基于对象的。它是�
 
 但是如果你尝试在浏览器里运行这段代码，你会得到一个语法错误：
 
-![error](images/error.avif)
+![error](react_foundations_images/error.avif)
 
 这是因为 `<h1>...</h1>` 并不是合法的 JavaScript 语法。这其实是一段 JSX 代码。
 
@@ -338,7 +338,7 @@ JSX 是一种对 JavaScript 的语法扩展，它允许你用一种跟 HTML 相�
 
 使用组件可以构建一些自包含的、可复用的代码片段。你可以把组件想象成 **乐高积木**，用一个个的积木可以搭建出很多高大的结构。如果你想更新 UI 的某一个部分，你可以更新这部分的组件。
 
-![components](images/components.avif)
+![components](react_foundations_images/components.avif)
 
 这种模块化的结构可以提高代码的可维护性，因为你可以轻松地添加、更新或删除特定的组件，而不需要改动应用剩余的部分。
 
@@ -453,7 +453,7 @@ ReactDOM.render(<Header />, app);
 
 你可以持续嵌套 React 组件，组成一个组件树。
 
-![component-tree](images/component-tree.avif)
+![component-tree](react_foundations_images/component-tree.avif)
 
 比如说，你最顶层的 `<HomPage>` 组件可以包含一个 `<Header>`，一个 `<Article>` 和一个 `<Footer>` 组件。然后每个组件又可以包含它们各自的子组件。比如说 `<Header>` 组件可以包含 `<Logo>`、`<Title>` 和 `<Navigation>` 等。
 
@@ -502,7 +502,7 @@ function HomePage() {
 
 同样的，我们也可以给 React 组件传递一些信息，作为组件的属性，它们被称为 `props`。
 
-![props](images/props.avif)
+![props](react_foundations_images/props.avif)
 
 跟 JavaScript 函数一样，你可以设计一些组件，让它们能接受自定义的参数，以便改变自身行为，或者选择性地呈现内容。然后你可以通过父组件把这些参数传递给子组件。
 
@@ -791,7 +791,7 @@ function HomePage() {
 
 React 中有一些函数被称为[钩子](https://react.dev/learn)。钩子可以允许我们给组件添加一些额外的逻辑，比如说 **状态**。你可以把状态想象为 UI 中会时常变化的东西，通常是由用户交互触发的。
 
-![state](images/state.avif)
+![state](react_foundations_images/state.avif)
 
 你可以 *使用状态* 来存储或者改变一个点赞按钮的点击次数。这就是这个 React 钩子的名称：`useState()`。
 
