@@ -201,4 +201,281 @@ DOM 是一种对 HTML 元素的呈现，这种呈现是基于对象的。它是�
 
 ## 第三章 开始使用 React
 
+要在项目中使用 React，你可以使用一个第三方网站 [unpkg.com](https://unpkg.com/) 加载两个 React 脚本：
+
+- **react** 是 React 的核心库。
+- **react-dom** 提供了一些特定于 DOM 的方法以便于你可以使用 React 操作 DOM。
+
+```html
+<html>
+  <body>
+    <div id="app"></div>
+ 
+    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+ 
+    <script type="text/javascript">
+      const app = document.getElementById('app');
+    </script>
+  </body>
+</html>
+```
+
+此时我们不通过纯 JavaSript 代码来操作 DOM 了，而是使用 `react-dom` 里的 `ReactDOM.render()` 方法告诉 React 我们想在 `#app` 元素内渲染一个 `h1` 标题。
+
+```html
+<html>
+  <body>
+    <div id="app"></div>
+ 
+    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+ 
+    <script type="text/javascript">
+      const app = document.getElementById('app');
+      ReactDOM.render(<h1>Develop. Preview. Ship. 🚀</h1>, app);
+    </script>
+  </body>
+</html>
+```
+
+但是如果你尝试在浏览器里运行这段代码，你会得到一个语法错误：
+
+![error](images/error.avif)
+
+这是因为 `<h1>...</h1>` 并不是合法的 JavaScript 语法。这其实是一段 JSX 代码。
+
+## 什么是 JSX？
+
+JSX 是一种对 JavaScript 的语法扩展，它允许你用一种跟 HTML 相似的语法来描述你的 UI。有关 JSX 特别棒的一点是，除了遵守 [JSX 的三条规则](https://react.dev/learn/writing-markup-with-jsx#the-rules-of-jsx)之外，你不需要再学习任何 HTML 和 JavaScript 之外的语法了。
+
+要注意，浏览器本身并不理解 JSX，所以你需要一个 JavaScript 编译器，比如 [Babel](https://babeljs.io/)，来把 JSX 代码转换为正常的 JavaScript 代码。
+
+## 在项目中添加 Babel
+
+把下面的脚本复制粘贴到 `index.html` 文件中，就把 Babel 添加到项目中了：
+
+```html
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+```
+
+另外，你还需要告诉 Babel 哪段代码需要进行转换，所以我们把 `script` 标签的类型改为 `type=text/jsx`。
+
+```html
+<html>
+  <body>
+    <div id="app"></div>
+    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <!-- Babel Script -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="text/jsx">
+      const app = document.getElementById('app');
+      ReactDOM.render(<h1>Develop. Preview. Ship. 🚀</h1>, app);
+    </script>
+  </body>
+</html>
+```
+
+现在你就可以在浏览器里运行代码并检查是否一切正常了。
+
+相比于只需要写这几行声明式的 React 代码：
+
+```html
+<script type="text/jsx">
+  const app = document.getElementById("app")
+  ReactDOM.render(<h1>Develop. Preview. Ship. 🚀</h1>, app)
+</script>
+```
+
+在上一节你需要写这么多命令式的 JavaScript 代码：
+
+```html
+<script type="text/javascript">
+  const app = document.getElementById('app');
+  const header = document.createElement('h1');
+  const text = 'Develop. Preview. Ship. 🚀';
+  const headerContent = document.createTextNode(text);
+  header.appendChild(headerContent);
+  app.appendChild(header);
+</script>
+```
+
+我们可以看到，使用 React 可以帮助我们砍掉很多重复代码。
+
+这就是 React 能做的，它是一个包含了很多可复用代码片段的库，来帮助我们完成各种任务。比如更新 UI。
+
+# 第四章 学习 React 必备的 JavaScript 知识
+
+尽管你可以同时学习 JavaScript 和 React，但如果你熟悉 JavaScript，学习 React 就会更容易一些。
+
+在后面的章节，我们会从 JavaScript 的角度介绍一些 React 的核心概念。下面是一些我们会提到的 JavaScript 内容：
+
+- [函数](https://developer.mozilla.org/docs/Web/JavaScript/Guide/Functions)和[箭头函数](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Functions/Arrow_functions)
+- [对象](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)
+- [数组和数组方法](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array)
+- [解构](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/Destructuring_assignment)
+- [模板字符串](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Template_literals)
+- [三元远算符](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/Conditional_Operator)
+- [ES 模块和导入/导出语法](https://developer.mozilla.org/docs/Web/JavaScript/Guide/Modules)
+
+尽管本教程不会涉及到很深的 JavaScript，但是保持跟进 JavaScript 的最新版本也是个好习惯。如果你对 JavaScript 尚不自信，不用担心，不要因为此而停止了学习 React 的脚步！
+
+## React 的核心概念
+
+要用 React 构建应用，你需要了解 React 的三个核心概念：
+
+- 组件
+- 属性
+- 状态
+
+在之后的几个章节，我们会介绍这些概念，并提供一些学习资源。
+
+# 第五章 用组件构建 UI
+
+用户界面可以分解成更小的构建模块，我们称为 **组件**。
+
+使用组件可以构建一些自包含的、可复用的代码片段。你可以把组件想象成 **乐高积木**，用一个个的积木可以搭建出很多高大的结构。如果你想更新 UI 的某一个部分，你可以更新这部分的组件。
+
+![components](images/components.avif)
+
+这种模块化的结构可以提高代码的可维护性，因为你可以轻松地添加、更新或删除特定的组件，而不需要改动应用剩余的部分。
+
+关于 React 组件很棒的一点是，它们都是 JavaScript。我们来看看如何从 JavaScript 的角度如何编写一个 React 组件。
+
+## 创建组件
+
+在 React 中，组件都是 **函数**。在你的 `script` 标签中，编写一个名为 `header` 的函数：
+
+```html
+<script type="text/jsx">
+  const app = document.getElementById("app")
+ 
+ 
+  function header() {
+  }
+ 
+  ReactDOM.render(<h1>Develop. Preview. Ship. 🚀</h1>, app)
+</script>
+```
+
+组件是一个 **返回 UI 元素** 的函数。在函数的返回语句中，你可以编写 JSX 代码：
+
+```html
+<script type="text/jsx">
+  const app = document.getElementById("app")
+ 
+  function header() {
+     return (<h1>Develop. Preview. Ship. 🚀</h1>)
+   }
+ 
+  ReactDOM.render(, app)
+</script>
+```
+
+要渲染这个组件到 DOM，你只需要把它作为第一个参数传递给 `ReactDOM.render()`：
+
+```html
+<script type="text/jsx">
+ 
+  const app = document.getElementById("app")
+ 
+  function header() {
+     return (<h1>Develop. Preview. Ship. 🚀</h1>)
+   }
+ 
+ 
+   ReactDOM.render(header, app)
+</script>
+```
+
+但是等等，如果你尝试在浏览器里运行这段代码，你会得到一个错误。要修正这个错误，你要做两件事：
+
+首先，React 的组件必须是首字母大写的，这样可以跟纯 HTML 和 JavaScript 代码区分开。
+
+```html
+function Header() {
+  return <h1>Develop. Preview. Ship. 🚀</h1>;
+}
+ 
+// Capitalize the React Component
+ReactDOM.render(Header, app);
+```
+
+其次，你可以像使用 HTML 标签那样使用 React 组件，也就是用尖括号 `<>`。
+
+```html
+function Header() {
+  return <h1>Develop. Preview. Ship. 🚀</h1>;
+}
+ 
+ReactDOM.render(<Header />, app);
+```
+
+## 嵌套组件
+
+通常一个应用不只有一个组件。你可以在 React 组件中 **嵌套** 其他组件，就想常规的 HTML 元素那样。
+
+在这个例子中，创建一个名为 `HomePage` 的组件：
+
+```html
+function Header() {
+  return <h1>Develop. Preview. Ship. 🚀</h1>;
+}
+function HomePage() {
+  return <div></div>;
+}
+ 
+ReactDOM.render(<Header />, app);
+```
+
+然后把 `<Header>` 组件嵌入到 `<HomePage>` 组件中：
+
+```html
+function Header() {
+  return <h1>Develop. Preview. Ship. 🚀</h1>;
+}
+ 
+function HomePage() {
+  return (
+    <div>
+      {/* Nesting the Header component */}
+      <Header />
+    </div>
+  );
+}
+ 
+ReactDOM.render(<Header />, app);
+```
+
+## 组件树
+
+你可以持续嵌套 React 组件，组成一个组件树。
+
+![component-tree](images/component-tree.avif)
+
+比如说，你最顶层的 `<HomPage>` 组件可以包含一个 `<Header>`，一个 `<Article>` 和一个 `<Footer>` 组件。然后每个组件又可以包含它们各自的子组件。比如说 `<Header>` 组件可以包含 `<Logo>`、`<Title>` 和 `<Navigation>` 等。
+
+这样的模块化结构允许你在应用的不同部分复用某些组件。
+
+在我们的项目中，因为 `<HomePage>` 是现在最顶层的组件了，你可以把它传递给 `ReactDOM.render()` 方法。
+
+```html
+function Header() {
+  return <h1>Develop. Preview. Ship. 🚀</h1>;
+}
+ 
+function HomePage() {
+  return (
+    <div>
+      <Header />
+    </div>
+  );
+}
+ 
+ReactDOM.render(<HomePage />, app);
+```
+
+# 第六章 使用属性呈现数据
+
 
