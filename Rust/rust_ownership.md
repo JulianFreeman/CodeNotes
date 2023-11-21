@@ -333,8 +333,124 @@ fn add_suffix(mut name: String) -> String {
 
 [^2]: 从另一方面说，所有权是 *指针* 管理的机制。但是我们还没有讲到如何在堆之外的地方获取指针。我们会在下一部分讨论。
 
+# 引用和借用
 
+所有权，box 和转移提供了一个使用堆进行安全编程的基础。然而，只能转移的话，挺不方便的。比如说，你想读取某个字符串两遍：
 
+```rust
+fn main() {
+    let m1 = String::from("Hello");
+    let m2 = String::from("world");
+    greet(m1, m2);
+    let s = format!("{} {}", m1, m2); // Error: m1 and m2 are moved
+}
+
+fn greet(g1: String, g2: String) {
+    println!("{} {}!", g1, g2);
+}
+```
+
+> 上述代码无法编译
+
+在这个例子中，调用 `greet` 把数据从 `m1` 和 `m2` 转移到了 `greet` 的参数中。两个字符串都在 `greet` 的结尾被释放了，因此就不能再在 `main` 中被使用了。如果我们尝试使用 `format!(..)` 这样的操作去读取它们，就会引发一个未定义行为。因此 Rust 编译器拒绝编译该程序，并报出一个跟上一节一样的错误：
+
+```text
+error[E0382]: borrow of moved value: `m1`
+ --> test.rs:5:30
+ (...rest of the error...)
+```
+
+这个转移操作实在是太不方便了。程序经常会需要用到一个字符串两次以上，一种解决办法是我们可以让 `greet` 返回字符串的所有权，像这样：
+
+```rust
+fn main() {
+    let m1 = String::from("Hello");
+    let m2 = String::from("world");
+    let (m1_again, m2_again) = greet(m1, m2);
+    let s = format!("{} {}", m1_again, m2_again);
+}
+
+fn greet(g1: String, g2: String) -> (String, String) {
+    println!("{} {}!", g1, g2);
+    (g1, g2)
+}
+```
+
+然而，这种形式的程序有点冗余了。Rust 提供了一种更加简便地读取和写入的操作方式：引用。
+
+## 引用是不拥有数据的指针
+
+**引用** 是一种指针。下面这个例子使用引用来重写我们的 `greet` 程序，让其看起来更加简洁：
+
+```rust
+fn main() {
+    let m1 = String::from("Hello");
+    let m2 = String::from("world"); // L1
+    greet(&m1, &m2); // L3 // note the ampersands
+    let s = format!("{} {}", m1, m2);
+}
+
+fn greet(g1: &String, g2: &String) { // note the ampersands
+    // L2
+    println!("{} {}!", g1, g2);
+}
+```
+
+表达式 `&m1` 使用与操作符创建了一个对 `m1` 的引用（或者说“借用”）。`greet` 的参数 `g1` 的类型改为了 `&String`，意思是“这是一个对 `String` 的引用”。
+
+观察 L2，从 `g1` 到字符串 `"Hello"` 有两步。`g1` 是一个指向栈上的 `m1` 的引用，而 `m1` 是一个字符串 box，指向了堆上的 `"Hello"`。
+
+当 `m1` 拥有堆上的数据 `"Hello"` 的时候，`g1` 既 *不* 拥有 `m1` 也 *不* 拥有 `"Hello"`。因此当 `greet` 结束之后，程序到达了 L3 的位置，没有堆数据被释放。只有 `greet` 的栈帧没了。这个现象与我们的 *Box 的释放原则* 相符。因为 `g1` 不拥有 `"Hello"`，所以 Rust 不会因为 `g1` 而释放 `"Hello"`。
+
+引用是 **不拥有数据的指针**，因为它们不拥有它们所指向的数据。
+
+## 解引用一个指针来获取它的数据
+
+前一个例子没有展示 Rust 是如何追踪一个指针到它指向的数据的。比如说，这个 `println!` 宏莫名其妙地可以同时适用于字符串本身 `String` 和对字符串的引用 `&String`。这个底层机制是 **解引用** 操作，写作星号 `*`。比如说，这是一个用各种不同方式使用解引用的程序：
+
+```rust
+let mut x: Box<i32> = Box::new(1);
+let a: i32 = *x;         // *x reads the heap value, so a = 1
+*x += 1;                 // *x on the left-side modifies the heap value,
+                         //     so x points to the value 2
+
+let r1: &Box<i32> = &x;  // r1 points to x on the stack
+let b: i32 = **r1;       // two dereferences get us to the heap value
+
+let r2: &i32 = &*x;      // r2 points to the heap value directly
+let c: i32 = *r2;    // so only one dereference is needed to read it
+```
+
+注意看，`r1` 指向的是栈上的 `x`，而 `r2` 指向的是堆上的数值 `2`。
+
+如果写 Rust 代码的话你大概率是见不到太多解引用操作符的。Rust 会在一些特定场合下隐式地插入解引用或者引用，比如说当你用点操作符调用一个方法的时候。举个例子，下面这个程序展示了两种等同的调用 `i32:abs` 和 `str::len` 的方法：
+
+```rust
+let x: Box<i32> = Box::new(-1);
+let x_abs1 = i32::abs(*x); // explicit dereference
+let x_abs2 = x.abs();      // implicit dereference
+assert_eq!(x_abs1, x_abs2);
+
+let r: &Box<i32> = &x;
+let r_abs1 = i32::abs(**r); // explicit dereference (twice)
+let r_abs2 = r.abs();       // implicit dereference (twice)
+assert_eq!(r_abs1, r_abs2);
+
+let s = String::from("Hello");
+let s_len1 = str::len(&s); // explicit reference
+let s_len2 = s.len();      // implicit reference
+assert_eq!(s_len1, s_len2);
+```
+
+这个例子展示了三种隐式转换：
+
+1. 函数 `i32::abs` 期望得到一个 `i32` 类型的输入，如果想用 `Box<i32>` 调用 `abs`，你需要显式地解引用，像 `i32::abs(*x)`。你也可以通过调用方法函数的语法 `x.abs()` 来隐式地解引用。这个点语法是一种函数调用的语法糖。
+2. 这种隐式转换也适用于多层指针。比如说用 `r: &Box<i32>` 调用 `abs` 会插入两次解引用。
+3. 这种隐式转换也适用于相反的方向。函数 `str::len` 期望一个 `&str` 的引用类型。如果你在一个有所有权的 `String` 上调用 `len`，Rust 会插入一个借用操作符。（当然，这里还有一层从 `String` 到 `str` 的转换）
+
+我们会在接下来的几章中继续讨论更多关于方法调用和隐式转换的内容。就目前而言，需要记住的就是这种转换会发生在方法调用和宏调用时。我们想要揭开 Rust 的这层面纱，以对 Rust 是如何运作的有一个更清晰的构想模型。
+
+## Rust 禁止同时借用和更改
 
 
 
