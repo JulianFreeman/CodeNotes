@@ -644,7 +644,7 @@ function HomePage() {
 
 ## 遍历列表
 
-有时候需要按照列表的形式呈现数据也是很常见的。你可以使用数组方法来操作数据，然后生成样式上相同但内容不同的 UI 元素。
+有时候按照列表的形式呈现数据也是很常见的。你可以使用数组方法来操作数据，然后生成样式上相同但内容不同的 UI 元素。
 
 > 注意：React 并不关心如何获取数据，这也就意味着你可以采用任何你需要的方式解决这个问题。稍后我们会讨论 Next.js 的[数据抓取功能](https://nextjs.org/learn/basics/data-fetching)。但是目前为止，我们可以使用一个简单的数组来表示数据。
 
@@ -683,7 +683,7 @@ function HomePage() {
 
 注意观察如何用花括号在 “JavaScript 之地”和 “JSX 之地”反复横跳。
 
-如果你运行这段代码，React 给你一个警告说缺少了 `key` 属性。这是因为 React 需要一个东西来唯一确定数组里的每个元素，这样它才知道如何在 DOM 里更新元素。
+如果你运行这段代码，React 会给你一个警告说缺少了 `key` 属性。这是因为 React 需要一个东西来唯一确定数组里的每个元素，这样它才知道如何在 DOM 里更新元素。
 
 我们可以使用名称本身，因为它们目前就是唯一的，但是通常我们推荐用一些其他能保证唯一性的东西，比如说一个元素 ID。
 
@@ -706,3 +706,438 @@ function HomePage() {
 
 # 第七章 使用状态添加交互性
 
+让我们来看看 React 是如何通过 **状态** 和 **事件处理器** 来帮助我们增加交互性的。
+
+在我们的例子中，让我们在 `HomePage` 组件中创建一个点赞按钮。首先，在 `return()` 语句中添加一个按钮元素。
+
+```tsx
+function HomePage() {
+  const names = ['Ada Lovelace', 'Grace Hopper', 'Margaret Hamilton'];
+ 
+  return (
+    <div>
+      <Header title="Develop. Preview. Ship. 🚀" />
+      <ul>
+        {names.map((name) => (
+          <li key={name}>{name}</li>
+        ))}
+      </ul>
+ 
+      <button>Like</button>
+    </div>
+  );
+}
+```
+
+## 监听事件
+
+要让按钮被点击时做点什么，我们可以使用 `onClick` 事件。
+
+```tsx
+function HomePage() {
+  // ...
+  return (
+    <div>
+      {/* ... */}
+      <button onClick={}>Like</button>
+    </div>
+  );
+}
+```
+
+在 React 中，事件名称都是驼峰式命名的。`onClick` 事件是其中一个你可以回应用户交互的事件。其他的比如 `onChange` 可以回应用户输入，`onSubmit` 可以回应表格提交。
+
+## 处理事件
+
+我们可以定义一个函数来“处理”事件，在返回语句之前创建一个 `handleClick()` 函数。
+
+```tsx
+function HomePage() {
+  // ...
+ 
+  function handleClick() {
+    console.log("increment like count")
+  }
+ 
+  return (
+    <div>
+      {/* ... */}
+	  <button onClick={}>Like</button>
+    </div>
+     )
+   }
+```
+
+然后我们可以在 `onClick` 事件被触发时调用 `handleClick` 函数。
+
+```tsx
+function HomePage() {
+  // 	...
+  function handleClick() {
+    console.log('increment like count');
+  }
+ 
+  return (
+    <div>
+      {/* ... */}
+      <button onClick={handleClick}>Like</button>
+    </div>
+  );
+}
+```
+
+## 状态和钩子
+
+React 中有一些函数被称为[钩子](https://react.dev/learn)。钩子可以允许我们给组件添加一些额外的逻辑，比如说 **状态**。你可以把状态想象为 UI 中会时常变化的东西，通常是由用户交互触发的。
+
+![state](images/state.avif)
+
+你可以 *使用状态* 来存储或者改变一个点赞按钮的点击次数。这就是这个 React 钩子的名称：`useState()`。
+
+```tsx
+function HomePage() {
+  React.useState();
+}
+```
+
+`useState()` 会返回一个数组，你可以通过 **数组解构** 来获取数组的值：
+
+```tsx
+function HomePage() {
+  const [] = React.useState();
+ 
+  // ...
+}
+```
+
+数组的第一个值是状态 `value`，你可以起任意的名字，但是建议是具有一些描述性：
+
+```tsx
+function HomePage() {
+  const [likes] = React.useState();
+ 
+  // ...
+}
+```
+
+数组的第二个值是一个可以更新 `value` 的函数，你也可以起任意的名字，但通常建议使用状态名加 `set` 前缀：
+
+```tsx
+function HomePage() {
+  const [likes, setLikes] = React.useState();
+ 
+  // ...
+}
+```
+
+你也可以给你的 `likes` 状态加一个初始值：0
+
+```tsx
+function HomePage() {
+  const [likes, setLikes] = React.useState(0);
+}
+```
+
+然后，我们可以检查一下这些状态在组件里是否能正常工作：
+
+```tsx
+function HomePage() {
+  // ...
+  const [likes, setLikes] = React.useState(0);
+ 
+  return (
+    // ...
+    <button onClick={handleClick}>Like({likes})</button>
+  );
+}
+```
+
+最后，我们可以在 `handleClick()` 中添加这个状态更新函数 `setLikes` 了：
+
+```tsx
+function HomePage() {
+  // ...
+  const [likes, setLikes] = React.useState(0);
+ 
+  function handleClick() {
+    setLikes(likes + 1);
+  }
+ 
+  return (
+    <div>
+      {/* ... */}
+      <button onClick={handleClick}>Likes ({likes})</button>
+    </div>
+  );
+}
+```
+
+现在点击按钮就会调用 `handleClick` 函数，然后调用 `setLikes` 函数来给当前的状态加一。
+
+> 注意：属性是传递给组件的第一个函数参数，但状态是在组件内初始化和存储的。你可以把状态信息作为属性传递给子组件，但更新状态的逻辑代码应该保留在创建状态的组件中。
+
+## 管理状态
+
+这只是对状态的一个入门介绍，对于管理状态和数据传递，我们还有很多要学的内容。推荐前往 React 文档的[增加交互性](https://react.dev/learn/adding-interactivity)和[管理状态](https://react.dev/learn/managing-state)章节学习更多内容。
+
+# 第八章 从 React 到 Next.js
+
+在前面的课程中，我们学习了如何使用 React。下面是我们最终的代码。
+
+```html
+<html>
+  <body>
+    <div id="app"></div>
+ 
+    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+ 
+    <script type="text/jsx">
+      const app = document.getElementById("app")
+ 
+      function Header({ title }) {
+        return <h1>{title ? title : "Default title"}</h1>
+      }
+ 
+      function HomePage() {
+        const names = ["Ada Lovelace", "Grace Hopper", "Margaret Hamilton"]
+ 
+        const [likes, setLikes] = React.useState(0)
+ 
+        function handleClick() {
+          setLikes(likes + 1)
+        }
+ 
+        return (
+          <div>
+            <Header title="Develop. Preview. Ship. 🚀" />
+            <ul>
+              {names.map((name) => (
+                <li key={name}>{name}</li>
+              ))}
+            </ul>
+ 
+            <button onClick={handleClick}>Like ({likes})</button>
+          </div>
+        )
+      }
+ 
+      ReactDOM.render(<HomePage />, app)
+    </script>
+  </body>
+</html>
+```
+
+我们刚刚入门了 React 的三大核心概念：**组件**，**属性** 和 **状态**。对这三大概念有坚实的基本了解会帮助我们学习构建 React 应用。如果你自我感觉良好，也可以看看下面的 React 内容：
+
+- [React 如何处理渲染](https://react.dev/learn/render-and-commit)和[如何使用引用](https://react.dev/learn/referencing-values-with-refs)
+- [如何管理状态](https://react.dev/learn/managing-state)
+- [如何使用上下文传递深层嵌套的数据](https://react.dev/learn/passing-data-deeply-with-context)
+- [如何使用 React API 钩子](https://react.dev/reference/react)，比如 `useEffect()`
+
+## React 文档
+
+这些年诞生了很多课程、视频和文章来帮助开发者学习 React。尽管要推荐一个符合大家学习方式的资源并不容易，但是 [React 文档](https://react.dev/)绝对是其中一个宝贵的资源，里面包含了可以交互的沙盒，以帮助我们练习学到的内容。
+
+说到学习 React，**最好的方式就是练习**。你可以通过使用 `script` 标签往已有的项目中添加一些小组件来逐渐练习 React。但是很多开发者发现 React 所带来的开发和用户体验是如此优秀，以至于他们直接将他们的整个前端项目都用 React 改写了。
+
+## 从 React 到 Next.js
+
+尽管 React 在构建 UI 上很出色，但是要把构建的 UI 变成一个全功能可扩展的应用还是要下一番功夫的。好消息是，Next.js 可以处理这些配置的步骤，同时还包含了其他的功能来帮助我们构建 React 应用。
+
+下面，我们会把我们的例子从 React 转换到 Next.js，并讨论 Next.js 是如何工作的，同时介绍一些网页开发概念来帮助我们学习更高级的 Next.js 特性。
+
+# 第九章 安装 Next.js
+
+要把 Next.js 添加到我们的项目中，我们就不需要 [unpkg.com](http://unpkg.com/) 的 `react` 和 `react-dom` 脚本了。相反，我们可以直接通过 Node 的包管理器 `npm` 把它们安装到本地。
+
+> 注意：你需要在电脑上安装 Node.js（[最低版本要求](https://nextjs.org/docs/upgrading#minimum-nodejs-version)），你可以[在这里下载](https://nodejs.org/en/)。
+
+下载前，我们先创建一个名为 `package.json` 的文件，并写入一个空对象：
+
+```json
+{}
+```
+
+打开终端，运行 `npm install react react-dom next`。安装完成后，你就可以在 `package.json` 文件中看到你的项目依赖了。
+
+```json
+{
+  "dependencies": {
+    "next": "^12.1.0",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2"
+  }
+}
+```
+
+你还会看到一个名为 `node_modules` 的新文件夹，里面放着实际的依赖文件（根据设置的不同，这个文件有可能是隐藏的）。
+
+回到 `index.html` 文件，我们可以删除如下代码：
+
+1. `react` 和 `react-dom` 脚本，因为我们已经使用 NPM 安装在本地了。
+2. `<html>` 和 `<body>` 标签，因为 Next.js 会自动创建这些。
+3. 跟 `app` 元素交互的代码和 `ReactDOM.render()` 方法。
+4. `Babel` 脚本，因为 Next.js 自己有编译器，可以把 JSX 转换为合法的 JavaScript 代码。
+5. `<script type="text/jsx">` 标签。
+6. `React.useState(0)` 里面的 `React.`。
+
+删除上面的代码后，在文件最开头添加一行 `import { useState } from "react"`，你最终的代码应该如下所示：
+
+```tsx
+import { useState } from 'react';
+ 
+function Header({ title }) {
+  return <h1>{title ? title : 'Default title'}</h1>;
+}
+ 
+function HomePage() {
+  const names = ['Ada Lovelace', 'Grace Hopper', 'Margaret Hamilton'];
+ 
+  const [likes, setLikes] = useState(0);
+ 
+  function handleClick() {
+    setLikes(likes + 1);
+  }
+ 
+  return (
+    <div>
+      <Header title="Develop. Preview. Ship. 🚀" />
+      <ul>
+        {names.map((name) => (
+          <li key={name}>{name}</li>
+        ))}
+      </ul>
+ 
+      <button onClick={handleClick}>Like ({likes})</button>
+    </div>
+  );
+}
+```
+
+因为现在这个 HTML 文件里只剩下 JSX 代码了，所以你可以把文件后缀名从 `.html` 改为 `.js` 或者 `.jsx`。
+
+现在，要想把它完全转为 Next.js 应用，你还需要做几件事：
+
+1. 把 `index.js` 文件转移到一个名为 `pages` 的新文件夹中（我们稍后会讨论这个）。
+2. 在主要的 React 组件前添加 `export default` 以帮助 Next.js 识别出哪个组件是当前页面要渲染的主组件。
+
+```tsx
+export default function HomePage() {
+  // ...
+}
+```
+
+3. 向 `package.json` 文件中添加一个 `scripts` 键，以允许你在开发时运行 Next.js 开发服务器。
+
+```json
+{
+  "scripts": {
+    "dev": "next dev"
+  }
+  "dependencies": {
+     "next": "^11.1.0",
+     "react": "^17.0.2",
+     "react-dom": "^17.0.2"
+  }
+}
+```
+
+## 运行开发服务器
+
+要查看能不能正常工作，你可以在终端里运行 `npm run dev` 然后在浏览器里打开 [localhost:3000](http://localhost:3000/)。然后你可以稍稍修改一点代码然后保存一下。
+
+当你保存文件的时候，你应该会注意到，浏览器自动刷新了页面，并更新了你更改的内容。
+
+这个功能叫[快速刷新](https://nextjs.org/docs/basic-features/fast-refresh)。当你更改或者重新配置 Next.js 的时候，这个功能会给你一个即时的反馈。
+
+让我们回溯一下，我们的代码从这样
+
+```html
+<html>
+  <body>
+    <div id="app"></div>
+ 
+    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+ 
+    <script type="text/jsx">
+      const app = document.getElementById("app")
+ 
+      function Header({ title }) {
+        return <h1>{title ? title : "Default title"}</h1>
+      }
+ 
+      function HomePage() {
+        const names = ["Ada Lovelace", "Grace Hopper", "Margaret Hamilton"]
+        const [likes, setLikes] = React.useState(0)
+ 
+        function handleClick() {
+          setLikes(likes + 1)
+        }
+ 
+        return (
+          <div>
+            <Header title="Develop. Preview. Ship. 🚀" />
+            <ul>
+              {names.map((name) => (
+                <li key={name}>{name}</li>
+              ))}
+            </ul>
+ 
+            <button onClick={handleClick}>Like ({likes})</button>
+          </div>
+        )
+      }
+ 
+      ReactDOM.render(<HomePage />, app)
+    </script>
+  </body>
+</html>
+```
+
+变成了这样
+
+```tsx
+import { useState } from 'react';
+ 
+function Header({ title }) {
+  return <h1>{title ? title : 'Default title'}</h1>;
+}
+ 
+export default function HomePage() {
+  const names = ['Ada Lovelace', 'Grace Hopper', 'Margaret Hamilton'];
+  const [likes, setLikes] = useState(0);
+ 
+  function handleClick() {
+    setLikes(likes + 1);
+  }
+ 
+  return (
+    <div>
+      <Header title="Develop. Preview. Ship. 🚀" />
+      <ul>
+        {names.map((name) => (
+          <li key={name}>{name}</li>
+        ))}
+      </ul>
+ 
+      <button onClick={handleClick}>Like ({likes})</button>
+    </div>
+  );
+}
+```
+
+从外表上看，这只是代码上的一点小小的删减，但是它也向我们展示了一些重要的事情：React 是一个 **库**，它提供了很多可以用于构建现代交互式 UI 的 **重要** 工具。当然，要把这些 UI 整合进一个应用里还是要些功夫的。
+
+回看一下这个整合，你可能已经感觉到了那么一点使用 Next.js 的好处了。你移除了 babel 脚本，这是一个有点复杂的工具配置，不过你再也不用考虑这个问题了。你也看到了快速刷新，这是一个你会在之后的 Next.js 开发生涯中经常用到的功能。
+
+# 下一步
+
+恭喜你创建了你的第一个 Next.js 应用！
+
+总结一下，你学习了 React 和 Next.js 的基础知识，把一个简单的 React 应用转换为一个 Next.js 应用。
+
+下一步，学习如何使用 Next.js 来[创建你的第一个应用](https://nextjs.org/learn/dashboard-app)吧——这个课程会向你介绍 **主要的** Next.js 特性以及练习构建一个更复杂一点的项目。
