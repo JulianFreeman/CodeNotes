@@ -495,4 +495,214 @@ function HomePage() {
 }
 ```
 
+但如果你想展示不同的内容呢，或者说你也不知道要展示什么内容，因为数据要从外部资源获取呢？
+
+常规的 HTML 元素中有一些属性可以传递一些信息，并允许你修改这些元素的某些行为。比如说，我们修改 `<img>` 的 `src` 属性可以改变其展示的图片，修改 `<a>` 标签的 `href` 属性可以改变链接的目标地址。
+
+同样的，我们也可以给 React 组件传递一些信息，作为组建的属性，它们被称为 `props`。
+
+![props](images/props.avif)
+
+跟 JavaScript 函数一样，你可以设计一些组件，让它们能接受自定义的参数，以便改变自身行为，或者选择性地呈现内容。然后你可以通过父组件把这些参数传递给子组件。
+
+> 注意：在 React 中，数据是沿着组件树向下传递的。这是一种 *单向数据传递*。状态（我们会在下一节讨论）可以作为属性从父组件传递给子组件。
+
+## 使用属性
+
+在 `HomePage` 组件中，我们可以传递一个自定义的属性 `title` 给 `Header` 组件，就像常规的 HTML 标签属性一样。
+
+```tsx
+function HomePage() {
+  return (
+    <div>
+      <Header title="React 💙" />
+    </div>
+  );
+}
+```
+
+而子组件 `Header` 可以把这些属性作为第一个 **函数参数** 接收：
+
+```tsx
+function Header(props) {
+  return <h1>Develop. Preview. Ship. 🚀</h1>;
+}
+```
+
+如果你打印 `props`，你会看到这是一个 **`object`**，里面有一个 `title` 属性。
+
+```tsx
+function Header(props) {
+  console.log(props); // { title: "React 💙" }
+  return <h1>React 💙</h1>;
+}
+```
+
+既然 `props` 是一个 `object`，那么我们可以使用 **对象解构** 来显式地给属性命名：
+
+```tsx
+function Header({ title }) {
+  console.log(title); // "React 💙"
+  return <h1>React 💙</h1>;
+}
+```
+
+然后你可以把 `h1` 内的文字替换为 `title` 变量。
+
+```tsx
+function Header({ title }) {
+  console.log(title);
+  return <h1>title</h1>;
+}
+```
+
+如果现在打开浏览器，你会看到实际呈现的是 `"title"` 本身，而不是这个变量的内容。这是因为 React 以为你只是想渲染一个纯文本。
+
+你需要某种方式告诉 React 这是一个 JavaScript 变量。
+
+## 在 JSX 中使用变量
+
+要使用自定义的变量，我们可以用 **花括号 `{}`**，这是一个特殊的 JSX 语法，可以允许你在 JSX 标记中编写常规的 JavaScript 代码。
+
+```tsx
+function Header({ title }) {
+  console.log(title);
+  return <h1>{title}</h1>;
+}
+```
+
+你可以把花括号想象为从 “JSX 之地”进入 “JavaScript 之地”的方式。你可以在花括号内添加任意 **JavaScript 表达式**（能够计算出某个单个值的东西），比如说：
+
+1. 一个 **对象的属性**
+
+```tsx
+function Header(props) {
+  return <h1>{props.title}</h1>;
+}
+```
+
+2. 一个 **模板字符串**
+
+```tsx
+function Header({ title }) {
+  return <h1>{`Cool ${title}`}</h1>;
+}
+```
+
+3. **函数的返回值**
+
+```tsx
+function createTitle(title) {
+  if (title) {
+    return title;
+  } else {
+    return 'Default title';
+  }
+}
+ 
+function Header({ title }) {
+  return <h1>{createTitle(title)}</h1>;
+}
+```
+
+4. 或者 **三元运算符**
+
+```tsx
+function Header({ title }) {
+  return <h1>{title ? title : 'Default Title'}</h1>;
+}
+```
+
+现在你可以向 `title` 这个属性传递任意字符串，而且因为你在组件里写了一个三元运算符来处理默认情况，你甚至可以不用传递这个 `title` 属性。
+
+```tsx
+function Header({ title }) {
+  return <h1>{title ? title : 'Default title'}</h1>;
+}
+ 
+function HomePage() {
+  return (
+    <div>
+      <Header />
+    </div>
+  );
+}
+```
+
+现在你的组件可以接受任意 `title` 属性了，你可以在应用的任何部分重用。你只需要改动一下 `title` 值就可以：
+
+```tsx
+function HomePage() {
+  return (
+    <div>
+      <Header title="React 💙" />
+      <Header title="A new title" />
+    </div>
+  );
+}
+```
+
+## 遍历列表
+
+有时候需要按照列表的形式呈现数据也是很常见的。你可以使用数组方法来操作数据，然后生成样式上相同但内容不同的 UI 元素。
+
+> 注意：React 并不关心如何获取数据，这也就意味着你可以采用任何你需要的方式解决这个问题。稍后我们会讨论 Next.js 的[数据抓取功能](https://nextjs.org/learn/basics/data-fetching)。但是目前为止，我们可以使用一个简单的数组来表示数据。
+
+向 `HomePage` 组件添加一个名称数组：
+
+```tsx
+function HomePage() {
+  const names = ['Ada Lovelace', 'Grace Hopper', 'Margaret Hamilton'];
+ 
+  return (
+    <div>
+      <Header title="Develop. Preview. Ship. 🚀" />
+    </div>
+  );
+}
+```
+
+你可以使用 `array.map()` 方法遍历数组，然后用 **箭头函数** 把名称映射到列表元素。
+
+```tsx
+function HomePage() {
+  const names = ['Ada Lovelace', 'Grace Hopper', 'Margaret Hamilton'];
+ 
+  return (
+    <div>
+      <Header title="Develop. Preview. Ship. 🚀" />
+      <ul>
+        {names.map((name) => (
+          <li>{name}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+注意观察如何用花括号在 “JavaScript 之地”和 “JSX 之地”反复横跳。
+
+如果你运行这段代码，React 给你一个警告说缺少了 `key` 属性。这是因为 React 需要一个东西来唯一确定数组里的每个元素，这样它才知道如何在 DOM 里更新元素。
+
+我们可以使用名称本身，因为它们目前就是唯一的，但是通常我们推荐用一些其他能保证唯一性的东西，比如说一个元素 ID。
+
+```tsx
+function HomePage() {
+  const names = ['Ada Lovelace', 'Grace Hopper', 'Margaret Hamilton'];
+ 
+  return (
+    <div>
+      <Header title="Develop. Preview. Ship. 🚀" />
+      <ul>
+        {names.map((name) => (
+          <li key={name}>{name}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+# 第七章 使用状态添加交互性
 
