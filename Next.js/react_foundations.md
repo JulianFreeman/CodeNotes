@@ -393,7 +393,7 @@ JSX 是一种对 JavaScript 的语法扩展，它允许你用一种跟 HTML 相�
 
 首先，React 的组件必须是首字母大写的，这样可以跟纯 HTML 和 JavaScript 代码区分开。
 
-```html
+```tsx
 function Header() {
   return <h1>Develop. Preview. Ship. 🚀</h1>;
 }
@@ -404,7 +404,7 @@ ReactDOM.render(Header, app);
 
 其次，你可以像使用 HTML 标签那样使用 React 组件，也就是用尖括号 `<>`。
 
-```html
+```tsx
 function Header() {
   return <h1>Develop. Preview. Ship. 🚀</h1>;
 }
@@ -418,7 +418,7 @@ ReactDOM.render(<Header />, app);
 
 在这个例子中，创建一个名为 `HomePage` 的组件：
 
-```html
+```tsx
 function Header() {
   return <h1>Develop. Preview. Ship. 🚀</h1>;
 }
@@ -431,7 +431,7 @@ ReactDOM.render(<Header />, app);
 
 然后把 `<Header>` 组件嵌入到 `<HomePage>` 组件中：
 
-```html
+```tsx
 function Header() {
   return <h1>Develop. Preview. Ship. 🚀</h1>;
 }
@@ -460,7 +460,7 @@ ReactDOM.render(<Header />, app);
 
 在我们的项目中，因为 `<HomePage>` 是现在最顶层的组件了，你可以把它传递给 `ReactDOM.render()` 方法。
 
-```html
+```tsx
 function Header() {
   return <h1>Develop. Preview. Ship. 🚀</h1>;
 }
@@ -477,5 +477,22 @@ ReactDOM.render(<HomePage />, app);
 ```
 
 # 第六章 使用属性呈现数据
+
+目前为止，如果你想多次使用 `<Header />` 的话，你每次都会得到相同的内容。
+
+```tsx
+function Header() {
+  return <h1>Develop. Preview. Ship. 🚀</h1>;
+}
+ 
+function HomePage() {
+  return (
+    <div>
+      <Header />
+      <Header />
+    </div>
+  );
+}
+```
 
 
