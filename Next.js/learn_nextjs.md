@@ -975,5 +975,315 @@ WHERE invoices.amount = 666;
 
 # 第七章 抓取数据
 
+现在我们已经有了数据库，也填充了数据，让我们来看看在应用中抓取数据的几种方式吧，同时也开发好仪表盘的预览页面。
+
+> **本章我们会讲到……**
+> - 学习几种抓取数据的方式：API，ORM，SQL，等等
+> - 服务器组件是如何更安全地帮助我们获取后端资源的
+> - 网络瀑布是啥
+> - 如何实现用 JavaScript 模式并行抓取数据
+
+## 选择抓取数据的方式
+
+### API 层
+
+API 是应用和数据库之间的中介层。下面几种情况你可能会需要用 API：
+
+- 如果你使用的是提供 API 的第三方服务。
+- 如果你是在客户端抓取数据的，你想在服务器上运行一个 API 层来避免你的数据库密钥暴露给用户
+
+在 Next.js 中，你可以使用 [Route Handlers](https://nextjs.org/docs/app/building-your-application/routing/route-handlers) 来创建 API 端点。
+
+### 数据库查询
+
+如果你搭建的是一个全栈应用，你会需要编写一些逻辑代码跟数据库交互。对于像 Postgres 这样的[关系型数据库](https://aws.amazon.com/relational-database/)，你可以用 SQL，或者 [ORM](https://vercel.com/docs/storage/vercel-postgres/using-an-orm#)（比如 [Prisma](https://www.prisma.io/)）来实现这点。
+
+下面几种情况下你可能会需要手动编写数据库查询代码：
+
+- 创建 API 端点，你需要编写跟数据库交互的逻辑代码。
+- 如果你使用的是 React 服务器组件（在服务器上抓取数据），你可以跳过 API 层，直接向数据库查询数据，而不用担心数据库密钥暴露给用户。
+
+让我们了解一些关于 React 服务器组件的内容。
+
+### 使用服务器组件抓取数据
+
+默认情况下，Next.js 应用使用的都是 **React 服务器组件**。用服务器组件抓取数据是一种相对较新的方式，有以下几种好处：
+
+- 服务器组件支持 promise，这是一种解决像抓取数据这样的异步任务的简单方案。你可以使用 `async/await` 这样的语法，而不用涉及 `useEffect`，`useState` 或者其他的抓取数据的库。
+- 服务器组件在服务器上运行，因此你可以把重要数据的抓取和逻辑保留在服务器端，只把结果发送给用户。
+- 前面提到了，因为服务器组件是在服务器上运行的，你可以直接查询数据库而不用额外罩一层 API 了。
+
+### 使用 SQL
+
+对于我们的仪表盘项目，我们会使用 [Vercel Postgres SDK](https://vercel.com/docs/storage/vercel-postgres/sdk) 和 SQL 来编写数据库查询。下面是我们这么做的几点原因：
+
+- SQL 是查询关系型数据库的行业标准（比如，ORM 在底层也是生成了 SQL）。
+- 对于 SQL 有一个基本的了解可以帮助我们理解关系型数据库的基础，有助于我们使用其他工具。
+- SQL 很强大，可以允许我们抓取和操作特定的数据。
+- Vercel Postgres SDK 可以防止 [SQL 注入](https://vercel.com/docs/storage/vercel-postgres/sdk#preventing-sql-injections)。
+
+如果你之前没用过 SQL 也不用担心，我们已经给你写好了查询语句。
+
+打开 `/app/lib/data.ts`，你会看到我们从 `@vercel/postgres` 中导入了 [`sql`](https://vercel.com/docs/storage/vercel-postgres/sdk#sql)，我们可以用这个函数查询数据库。
+
+```ts
+import { sql } from '@vercel/postgres';
+ 
+// ...
+```
+
+你可以在任意服务器组件中调用 `sql`。但是为了让你在组件间导航更容易些，我们把所有的数据查询都放在了 `data.ts` 文件中，然后可以在其他组件中导入它们。
+
+> **注意**：如果你在第六章时使用了自己的数据库，那么你需要修改 `/app/lib/data.ts` 的查询语句来适配你的数据库。
+
+## 为仪表盘预览页面抓取数据
+
+现在理解了抓取数据的各种不同方式，让我们抓点数据吧。打开 `/app/dashboard/page.tsx`，粘贴下面的代码，然后花点时间过一遍：
+
+```tsx
+import { Card } from '@/app/ui/dashboard/cards';
+import RevenueChart from '@/app/ui/dashboard/revenue-chart';
+import LatestInvoices from '@/app/ui/dashboard/latest-invoices';
+import { lusitana } from '@/app/ui/fonts';
+ 
+export default async function Page() {
+  return (
+    <main>
+      <h1 className={`${lusitana.className} mb-4 text-xl md:text-2xl`}>
+        Dashboard
+      </h1>
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {/* <Card title="Collected" value={totalPaidInvoices} type="collected" /> */}
+        {/* <Card title="Pending" value={totalPendingInvoices} type="pending" /> */}
+        {/* <Card title="Total Invoices" value={numberOfInvoices} type="invoices" /> */}
+        {/* <Card
+          title="Total Customers"
+          value={numberOfCustomers}
+          type="customers"
+        /> */}
+      </div>
+      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-4 lg:grid-cols-8">
+        {/* <RevenueChart revenue={revenue}  /> */}
+        {/* <LatestInvoices latestInvoices={latestInvoices} /> */}
+      </div>
+    </main>
+  );
+}
+```
+
+在上面的代码中：
+
+- `Page` 是一个 **异步** 组件，它可以允许你使用 `await` 来抓取数据。
+- 有三个组件可以接受数据，它们分别是 `<Card>`，`<RevenueChart>`，和 `<LatestInvoices>`。目前先将它们注释了，避免报错。
+
+## 为 `<RevenueChart>` 抓取数据
+
+要为 `<RevenueChart />` 组件抓取数据，从 `data.ts` 中导入 `fetchRevenue` 函数并在组件内调用：
+
+```tsx
+import { Card } from '@/app/ui/dashboard/cards';
+import RevenueChart from '@/app/ui/dashboard/revenue-chart';
+import LatestInvoices from '@/app/ui/dashboard/latest-invoices';
+import { lusitana } from '@/app/ui/fonts';
+import { fetchRevenue } from '@/app/lib/data';
+ 
+export default async function Page() {
+  const revenue = await fetchRevenue();
+  // ...
+}
+```
+
+然后，移除 `<RevenueChart />` 组件的注释，打开 `/app/ui/dashboard/revenue-chart.tsx` 文件并把里面的代码解注释。查看本地网页，你应该会看到一个使用了 `revenue` 数据的表格。
+
+![recent-revenue](./learn_nextjs_images/recent-revenue.avif)
+
+让我们继续获取更多数据吧！
+
+## 为 `<LatestInvoices>` 抓取数据
+
+对于 `<LatestInvoices />` 组件，我们需要获取最新的 5 条单据，按照日期排序。
+
+你可以抓取所有的单据并用 JavaScript 排序。对于少量数据来说这没什么问题，但如果你的应用逐渐变大，每次请求获取的数据和 JavaScript 要处理的数据就会显著地增长。
+
+我们不抓取所有数据然后再排序，相反，我们编写 SQL 查询语句只抓取 5 条单据。这个例子中，下面是我们提到的查询语句，它在 `data.ts` 文件中：
+
+```ts
+// Fetch the last 5 invoices, sorted by date
+const data = await sql<LatestInvoiceRaw>`
+  SELECT invoices.amount, customers.name, customers.image_url, customers.email
+  FROM invoices
+  JOIN customers ON invoices.customer_id = customers.id
+  ORDER BY invoices.date DESC
+  LIMIT 5`;
+```
+
+在 `/app/dashboard/page.tsx` 中，导入 `fetchLatestInvoices` 函数：
+
+```tsx
+import { Card } from '@/app/ui/dashboard/cards';
+import RevenueChart from '@/app/ui/dashboard/revenue-chart';
+import LatestInvoices from '@/app/ui/dashboard/latest-invoices';
+import { lusitana } from '@/app/ui/fonts';
+import { fetchRevenue, fetchLatestInvoices } from '@/app/lib/data';
+ 
+export default async function Page() {
+  const revenue = await fetchRevenue();
+  const latestInvoices = await fetchLatestInvoices();
+  // ...
+}
+```
+
+然后，把 `<LatestInvoices />` 组件解注释，你还需要在 `/app/ui/dashboard/latest-invoices.tsx` 文件中把跟 `<LatestInvoices />` 组件有关的代码也解注释。
+
+此时查看本地网页，你应该会看到数据库上最新的 5 条单据显示出来了。希望你现在能开始感受到直接查询数据库的优势了！
+
+![latest-invoices](./learn_nextjs_images/latest-invoices.avif)
+
+## 练习：为 `<Card>` 组件抓取数据
+
+现在，到你来为 `<Card>` 组件抓取数据了。卡片会展示如下数据：
+
+- 单据的总金额
+- 待办单据的总金额
+- 单据的总数量
+- 用户的总数量
+
+这里，你可能还是会想先抓取所有的数据，然后用 JavaScript 取处理。比如说用 `Array.length` 来获取单据和用户的总数。
+
+```js
+const totalInvoices = allInvoices.length;
+const totalCustomers = allCustomers.length;
+```
+
+但是有了 SQL，你可以只抓取你需要的数据。下面的代码比上面的稍微长了那么一点，但是它转移的数据比上面的要少很多：
+
+```js
+const invoiceCountPromise = sql`SELECT COUNT(*) FROM invoices`;
+const customerCountPromise = sql`SELECT COUNT(*) FROM customers`;
+```
+
+这次你要导入的函数叫 `fetchCardDate`，你需要把这个函数返回的值解构。
+
+> **提示**：
+> - 查看卡片组件都需要哪些数据。
+- 查看 `data.ts` 文件，看看函数返回了什么。
+
+当你完成后，你可以展开如下代码查看最终的代码：
+
+> 解决方案如下（当然无法折叠啦~）
+
+`/app/dashboard/page.tsx`
+
+```tsx
+import { Card } from '@/app/ui/dashboard/cards';
+import RevenueChart from '@/app/ui/dashboard/revenue-chart';
+import LatestInvoices from '@/app/ui/dashboard/latest-invoices';
+import { lusitana } from '@/app/ui/fonts';
+import {
+  fetchRevenue,
+  fetchLatestInvoices,
+  fetchCardData,
+} from '@/app/lib/data';
+ 
+export default async function Page() {
+  const revenue = await fetchRevenue();
+  const latestInvoices = await fetchLatestInvoices();
+  const {
+    numberOfInvoices,
+    numberOfCustomers,
+    totalPaidInvoices,
+    totalPendingInvoices,
+  } = await fetchCardData();
+ 
+  return (
+    <main>
+      <h1 className={`${lusitana.className} mb-4 text-xl md:text-2xl`}>
+        Dashboard
+      </h1>
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <Card title="Collected" value={totalPaidInvoices} type="collected" />
+        <Card title="Pending" value={totalPendingInvoices} type="pending" />
+        <Card title="Total Invoices" value={numberOfInvoices} type="invoices" />
+        <Card
+          title="Total Customers"
+          value={numberOfCustomers}
+          type="customers"
+        />
+      </div>
+      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-4 lg:grid-cols-8">
+        <RevenueChart revenue={revenue} />
+        <LatestInvoices latestInvoices={latestInvoices} />
+      </div>
+    </main>
+  );
+}
+```
+
+很好！你现在已经把所有预览页需要的数据都抓取到了，你的页面应该如下图所示：
+
+![complete-dashboard](./learn_nextjs_images/complete-dashboard.avif)
+
+然而，这里有两件事情你需要注意：
+
+1. 数据请求无意中相互阻塞了，造成了 **请求瀑布**。
+2. 默认情况下，Next.js 会 **预渲染** 页面以提高性能，这被叫做 **静态渲染**。如果你的数据更改了，仪表盘上不会有相应的更改。
+
+## 什么是请求瀑布？
+
+“瀑布”指的是有一系列的网络请求，每一个请求都只能在之前的请求结束后才能开始。在本例中，只有上一个请求返回数据了，下一个请求才开始。
+
+![sequential-parallel-data-fetching](./learn_nextjs_images/sequential-parallel-data-fetching.avif)
+
+比如说，我们需要等 `fetchRevenue()` 结束了才能开始执行 `fetchLatestInvoices()`，以此类推。
+
+```tsx
+const revenue = await fetchRevenue();
+const latestInvoices = await fetchLatestInvoices(); // wait for fetchRevenue() to finish
+const {
+  numberOfInvoices,
+  numberOfCustomers,
+  totalPaidInvoices,
+  totalPendingInvoices,
+} = await fetchCardData(); // wait for fetchLatestInvoices() to finish
+```
+
+这种模式倒不是说不对。有些情况下你的确需要这些瀑布，你希望等一个请求完全结束后再进行下一个请求，例如你可能需要先抓取用户的 ID 和头像，再抓取他们的好友列表。这种情况下，后一个请求依赖于前一个请求返回的数据。
+
+然而，这种现象有时候也可能是无意的，并且会影响性能。
+
+## 并行抓取数据
+
+一个避免请求瀑布的常见方法就是同一时间初始化所有数据请求，也就是并行地请求。
+
+在 JavaScript 中，你可以使用 [`Promise.all()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all) 或者 [`Promise.allSettled()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled) 函数来同时初始化所有的 promises。比如说，在 `data.ts` 中，我们可以在 `fetchCardData()` 函数中使用 `Promise.all()`：
+
+```ts
+export async function fetchCardData() {
+  try {
+    const invoiceCountPromise = sql`SELECT COUNT(*) FROM invoices`;
+    const customerCountPromise = sql`SELECT COUNT(*) FROM customers`;
+    const invoiceStatusPromise = sql`SELECT
+         SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS "paid",
+         SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) AS "pending"
+         FROM invoices`;
+ 
+    const data = await Promise.all([
+      invoiceCountPromise,
+      customerCountPromise,
+      invoiceStatusPromise,
+    ]);
+    // ...
+  }
+}
+```
+
+通过这种模式，你可以：
+
+- 同时执行所有的数据抓取，可以提升性能。
+- 使用 JavaScript 原生的模式，可以应用到任意第三方库或者框架。
+
+但是，使用这种 JavaScript 模式有一个 **问题**：如果其中一个数据请求比其他几个慢怎么办？
+
+# 第八章 静态和动态渲染
 
 # 第十六章 添加元数据
