@@ -6,7 +6,7 @@
 
 ## 我们要构建什么
 
-![dashboard](learn_nextjs_images/dashboard.avif)
+![dashboard](./learn_nextjs_images/dashboard.avif)
 
 在本教程中，我们将会构建一个简化版本的金融仪表盘，并拥有如下功能：
 
@@ -25,7 +25,7 @@
 
 - **样式**：在 Next.js 中设置样式的不同方式。
 - **优化**：如何优化图片、链接和字体。
-- **路由**：如何使用文件系统路由创建嵌套的层和页面。
+- **路由**：如何使用文件系统路由创建嵌套的布局和页面。
 - **数据抓取**：如何在 Vercel 上设置数据库，如何高效抓取和流式传输。
 - **检索和分页**：如何使用 URL 搜索参数实现检索和分页。
 - **更改数据**：如何使用 React 服务器操作更改数据，以及重新验证 Next.js 缓存。
@@ -53,7 +53,7 @@
 
 打开终端，[cd](https://developer.mozilla.org/en-US/docs/Learn/Tools_and_testing/Understanding_client-side_tools/Command_line#basic_built-in_terminal_commands) 到你想要保存项目的文件夹，然后运行如下命令，来创建一个 Next.js 应用：
 
-```shell
+```sh
 npx create-next-app@latest nextjs-dashboard --use-npm --example "https://github.com/vercel/next-learn/tree/main/dashboard/starter-example"
 ```
 
@@ -67,7 +67,7 @@ npx create-next-app@latest nextjs-dashboard --use-npm --example "https://github.
 
 安装之后，在代码编辑器中打开项目，然后打开 `nextjs-dashboard`。
 
-```shell
+```sh
 cd nextjs-dashboard
 ```
 
@@ -77,7 +77,7 @@ cd nextjs-dashboard
 
 你会发现这个项目有着如下的文件夹结构：
 
-![learn-folder-structure](learn_nextjs_images/learn-folder-structure.avif)
+![learn-folder-structure](./learn_nextjs_images/learn-folder-structure.avif)
 
 - **`/app`**：包含了所有的路由，组件，和应用的逻辑代码，大部分时候你都在这里工作。
 - **`/app/lib`**：包含应用使用的函数，比如一些可复用的工具函数或者数据抓取函数。
@@ -147,19 +147,19 @@ export type Invoice = {
 
 运行 `npm i` 安装项目的包
 
-```shell
+```sh
 npm i
 ```
 
 然后运行 `npm run dev` 打开开发服务器
 
-```shell
+```sh
 npm run dev
 ```
 
 `npm run dev` 会在 `3000` 端口上打开一个 Next.js 开发服务器。让我们来看看这是否管用。在浏览器上打开 http://localhost:3000 ，你的主页应该像下面这样：
 
-![acme-unstyled](learn_nextjs_images/acme-unstyled.avif)
+![acme-unstyled](./learn_nextjs_images/acme-unstyled.avif)
 
 # 第二章 CSS 样式
 
@@ -196,7 +196,7 @@ export default function RootLayout({
 
 确保开发服务器正常运行，保存修改，然后在浏览器里查看，你的主页现在应该如下图所示：
 
-![home-page-with-tailwind](learn_nextjs_images/home-page-with-tailwind.avif)
+![home-page-with-tailwind](./learn_nextjs_images/home-page-with-tailwind.avif)
 
 但是等等，你并没有添加任何 CSS 规则，这些样式是哪来的？
 
@@ -324,6 +324,257 @@ export default function InvoiceStatus({ status }: { status: string }) {
 
 # 第三章 优化字体和图片
 
+在之前的章节中，我们学习了如何给 Next.js 应用设置样式。现在让我们继续调整主页，添加一个自定义字体和一张主页图。
+
+> **本章我们会讲到……**
+> - 如何使用 `next/font` 添加自定义字体。
+> - 如何使用 `next/image` 添加图片。
+> - Next.js 是如何优化字体和图片的。
+
+## 为什么要优化字体？
+
+字体在网站设计中占据了相当重要的位置，但如果使用自定义字体时字体文件需要临时抓取和加载，那么就会很影响项目的性能。
+
+[累计布局偏移](https://web.dev/cls/)（CLS）是一项谷歌用来评估一个网站性能和用户体验的指标。当一个网站先用备用字体或者系统字体进行初始化渲染，等自定义字体加载完成后再将字体替换，这样就发生了布局偏移。这种替换会使得字体大小、间隔或者整个布局发生变化，也使得其周围的元素发生偏移。
+
+![font-layout-shift](./learn_nextjs_images/font-layout-shift.avif)
+
+当你使用 `next/font` 模块的时候，Next.js 会自动为你的应用优化字体。它会在构建时期把字体文件下载下来，然后把它们跟你的其他静态文件放在一起管理。这意味着当有人访问你的网站时，网站不需要额外的网络请求来下载字体，这就提升了网站性能。
+
+## 添加主字体
+
+让我们为你的应用添加一个自定义的谷歌字体吧！
+
+在 `/app/ui` 文件夹，创建一个名为 `fonts.ts` 的新文件。我们将使用这个文件来保存应用中所使用的字体。
+
+从 `next/font/google` 模块导入 `Inter` 字体，这将会是我们的主字体。然后指定要加载哪一个[子集](https://fonts.google.com/knowledge/glossary/subsetting)，在我们的例子中，是 `"latin"`。
+
+```ts
+import { Inter } from 'next/font/google';
+ 
+export const inter = Inter({ subsets: ['latin'] });
+```
+
+最后，在 `/app/layout.tsx` 文件的 `<body>` 元素中添加该字体。
+
+```tsx
+import '@/app/ui/global.css';
+import { inter } from '@/app/ui/fonts';
+ 
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body className={`${inter.className} antialiased`}>{children}</body>
+    </html>
+  );
+}
+```
+
+给 `<body>` 元素添加 `Inter` 之后，这个字体就会应用到整个应用中。这里，我们也添加了一个 Tailwind 类名 `antialiased` 来使字体更平滑。这不是必需的，但是加上会很不错。
+
+打开浏览器，打开开发者工具，选择 `body` 元素，你应该会看到 `Inter` 和 `Inter_Fallback` 出现在样式中。
+
+## 练习：添加第二字体
+
+你可以给应用中特定的元素添加字体。
+
+现在你自己来操作吧！在 `fonts.ts` 文件中，导入名为 `Lusitana` 的第二字体，然后把它传递给 `/app/page.tsx` 文件的 `<p>` 元素。要像前面那样指定字体子集的话，你还需要指定字体的 **字重**。
+
+当你完成了，可以展开下面的代码片段查看解决方案。
+
+> **提示**：
+> - 如果你不知道怎么传递字体的字重选项，看一下代码编辑器报的 TypeScript 错误。
+> - 访问[谷歌字体](https://fonts.google.com/)并搜索 `Lusitana` 来查看有哪些子集可选。
+> - 查看文档了解如何[添加多个字体](https://nextjs.org/docs/app/building-your-application/optimizing/fonts#using-multiple-fonts)和[所有可用选项](https://nextjs.org/docs/app/api-reference/components/font#font-function-arguments)。
+
+> 解决方案如下（当然无法折叠啦~）
+
+`/app/ui/fonts.ts`
+
+```ts
+import { Inter, Lusitana } from 'next/font/google';
+ 
+export const inter = Inter({ subsets: ['latin'] });
+ 
+export const lusitana = Lusitana({
+  weight: ['400', '700'],
+  subsets: ['latin'],
+});
+```
+
+`/app/page.tsx`
+
+```tsx
+import AcmeLogo from '@/app/ui/acme-logo';
+import { ArrowRightIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
+import { lusitana } from '@/app/ui/fonts';
+ 
+export default function Page() {
+  return (
+    // ...
+    <p
+      className={`${lusitana.className} text-xl text-gray-800 md:text-3xl md:leading-normal`}
+    >
+      <strong>Welcome to Acme.</strong> This is the example for the{' '}
+      <a href="https://nextjs.org/learn/" className="text-blue-500">
+        Next.js Learn Course
+      </a>
+      , brought to you by Vercel.
+    </p>
+    // ...
+  );
+}
+```
+
+最后 `<AcmeLogo />` 组件也使用了 Lusitana 字体，之前被注释了，为了防止报错，现在你可以移除它的注释了。
+
+```tsx
+// ...
+ 
+export default function Page() {
+  return (
+    <main className="flex min-h-screen flex-col p-6">
+      <div className="flex h-20 shrink-0 items-end rounded-lg bg-blue-500 p-4 md:h-52">
+        <AcmeLogo />
+        {/* ... */}
+      </div>
+    </main>
+  );
+}
+```
+
+很好，你现在已经给应用添加了两个自定义字体了，下面，让我们给主页添加一张主页图。
+
+## 为什么要优化图片？
+
+Next.js 在顶层文件夹 `/public` 中管理静态资源，比如图片。`/public` 文件夹内的文件都可以被应用使用。
+
+用常规的 HTML 语法，你需要像这样添加图片：
+
+```html
+<img
+  src="/hero.png"
+  alt="Screenshots of the dashboard project showing desktop version"
+/>
+```
+
+然而，这也意味着你需要手动做这些：
+
+- 确保你的图片可以在不同的屏幕大小上做出合适的响应
+- 为不同的设备指定图片大小
+- 防止图片加载时造成的布局偏移
+- 在用户视窗之外时延迟加载图片
+
+图片优化是网站开发中的一个大话题，甚至可以自成一派。为了避免手动实现这些优化细节，你可以使用 `next/image` 组件来自动优化图片。
+
+## `<Image>` 组件
+
+`<Image>` 组件是对 HTML `<img>` 标签的扩展，具有自动图片优化的功能，包括：
+
+- 在图片加载时防止自动布局偏移
+- 可以自动调整大小，以避免在小窗口的设备上加载大图片
+- 默认延迟加载图片（当进入用户视窗时加载图片）
+- 如果浏览器支持的话，用现代的图片格式，如 [WebP](https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Image_types#webp) 和 [AVIF](https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Image_types#avif_image) 管理图片
+
+## 添加桌面端主页图
+
+让我们来使用 `<Image>` 组件吧。如果你打开 `/public` 文件夹，你会看到有两张图片：`hero-desktop.png` 和 `hero-mobile.png`。两张图完全不同，它们一张用于显示在桌面端设备，另一张用于移动端。
+
+在 `/app/page.psx` 文件中，从 [`next/image`](https://nextjs.org/docs/api-reference/next/image) 中导入组件，然后在注释下面添加图片：
+
+```tsx
+import AcmeLogo from '@/app/ui/acme-logo';
+import { ArrowRightIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
+import { lusitana } from '@/app/ui/fonts';
+import Image from 'next/image';
+ 
+export default function Page() {
+  return (
+    // ...
+    <div className="flex items-center justify-center p-6 md:w-3/5 md:px-28 md:py-12">
+      {/* Add Hero Images Here */}
+      <Image
+        src="/hero-desktop.png"
+        width={1000}
+        height={760}
+        className="hidden md:block"
+        alt="Screenshots of the dashboard project showing desktop version"
+      />
+    </div>
+    //...
+  );
+}
+```
+
+这里，我们把 `width` 设置为 `1000` 像素，把 `height` 设置为 `760` 像素。手动设置图片的宽高来避免布局偏移是一个好办法，这个宽高比需要跟原图片的宽高比 **相同**。
+
+这里我们还添加了 `hidden` 类来从移动端屏幕中移除图片，和 `md:block` 来在桌面端屏幕中显示图片。
+
+![home-page-with-hero](./learn_nextjs_images/home-page-with-hero.avif)
+
+## 练习：添加移动端的主页图
+
+现在到你了！在刚才添加的图片下面，添加一张 `hero-mobile.png` 的 `<Image>` 组件。
+
+- 图片的 `width` 应该为 `560` 像素，`height` 应该为 `620` 像素。
+- 图片应该在移动端屏幕上显示，在桌面端隐藏。你可以通过开发者工具查看图片在桌面端和移动端中是否正常切换。
+
+当你完成之后，可以展开下面的代码查看解决方案。
+
+> 解决方案如下（当然无法折叠啦~）
+
+`/app/page.tsx`
+
+```tsx
+import AcmeLogo from '@/app/ui/acme-logo';
+import { ArrowRightIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
+import { lusitana } from '@/app/ui/fonts';
+import Image from 'next/image';
+ 
+export default function Page() {
+  return (
+    // ...
+    <div className="flex items-center justify-center p-6 md:w-3/5 md:px-28 md:py-12">
+      {/* Add Hero Images Here */}
+      <Image
+        src="/hero-desktop.png"
+        width={1000}
+        height={760}
+        className="hidden md:block"
+        alt="Screenshots of the dashboard project showing desktop version"
+      />
+      <Image
+        src="/hero-mobile.png"
+        width={560}
+        height={620}
+        className="block md:hidden"
+        alt="Screenshot of the dashboard project showing mobile version"
+      />
+    </div>
+    //...
+  );
+}
+```
+
+很好，现在我们的主页有自定义字体和主页图了。
+
+## 推荐阅读
+
+关于这些话题，还有很多内容，比如优化远程图片，或者使用本地的字体文件等。如果想了解更多内容，可以阅读下面的文档：
+
+- [图片优化文档](https://nextjs.org/docs/app/building-your-application/optimizing/images)
+- [字体优化文档](https://nextjs.org/docs/app/building-your-application/optimizing/fonts)
+- [从图片角度提升网站性能（MDN）](https://developer.mozilla.org/en-US/docs/Learn/Performance/Multimedia)
+- [网站字体（MDN）](https://developer.mozilla.org/en-US/docs/Learn/CSS/Styling_text/Web_fonts)
+
+# 第四章 创建布局和页面
 
 
 # 第六章 设置数据库
