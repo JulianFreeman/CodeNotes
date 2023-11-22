@@ -576,5 +576,142 @@ export default function Page() {
 
 # 第四章 创建布局和页面
 
+目前为止，我们的应用只有一个主页。现在让我们学习如何使用 **布局** 和 **页面** 来创建更多分页。
+
+> **本章我们会讲到……**
+> - 使用文件系统路由创建 `dashboard` 分页
+> - 理解文件夹和文件在创建新分页时的作用
+> - 创建一个嵌套的布局，以便在多个仪表盘分页中共享使用
+> - 理解什么是托管、部分渲染和根布局（root layout）。
+
+## 嵌套路由
+
+Next.js 使用的是文件系统路由，其中 **文件夹** 被用来嵌套分页。每一个文件夹代表了一个 **段路由**，映射到网址上就是一个 **URL 段**。
+
+![folders-to-url-segments](./learn_nextjs_images/folders-to-url-segments.avif)
+
+你可以使用 `layout.tsx` 和 `page.tsx` 文件为每一个分页创建不同的 UI。
+
+`page.tsx` 是一种特殊的 Next.js 文件，它导出了一个 React 组件，要想让分页变得可访问就得需要它。在我们的应用中，我们已经有一个这样的文件了：`/app/page.tsx`。它是 `/` 路由段对应的主页面。
+
+要在其下创建分页，我们可以在内创建文件夹，然后在文件夹内创建 `page.tsx` 文件，比如：
+
+![static-site-generation](./learn_nextjs_images/static-site-generation.avif)
+
+`/app/dashboard/page.tsx` 对应的是 `/dashboard` 网址路径。让我们创建一个页面看看如何。
+
+## 创建一个仪表盘页面
+
+在 `/app` 内创建一个名为 `dashboard` 的文件夹。然后在该文件夹内创建一个新的 `page.tsx` 文件，并包含如下内容：
+
+```tsx
+export default function Page() {
+  return <p>Dashboard Page</p>;
+}
+```
+
+现在，确保开发服务器正在运行，然后访问 http://localhost:3000/dashboard ，你应该会看到 “Dashboard Page” 字样。
+
+这就是如何在 Next.js 中创建不同的页面的方式了：创建一个文件夹，代表一个新的段路由，然后添加一个 `page` 文件。
+
+通过这个有特殊名字的 `page` 文件，Next.js 允许我们可以在此路由下[托管](https://nextjs.org/docs/app/building-your-application/routing#colocation) UI 组件、测试文件，和其他相关的代码。只有 `page` 文件中的内容是公开的。比如 `/ui` 和 `/lib` 文件夹是跟其他路由一起 *托管* 在 `/app` 中的。
+
+> 译注：其实我没怎么理解这句话。
+
+## 练习：创建其他仪表盘页面
+
+让我们练习创建更多分页吧。在我们的 `dashboard` 中，创建下面两个页面：
+
+1. **客户分页**：该分页应该通过 http://localhost:3000/dashboard/customers 访问，现在该页面可以只返回一个 `<p>Customers Page</p>` 元素。
+2. **单据分页**：该分页应该通过 http://localhost:3000/dashboard/invoices 访问，现在该分页可以只返回一个 `<p>Invoices Page</p>` 元素。
+
+花些时间整整这个练习，当你完成后，展开下面的代码查看解决方案。
+
+> 解决方案如下（当然无法折叠啦~）
+
+你应该有如下文件夹结构：
+
+![routing-solution](./learn_nextjs_images/routing-solution.avif)
+
+`/app/dashboard/customers/page.tsx`
+
+```tsx
+export default function Page() {
+  return <p>Customers Page</p>;
+}
+```
+
+`/app/dashboard/invoices/page.tsx`
+
+```tsx
+export default function Page() {
+  return <p>Invoices Page</p>;
+}
+```
+
+## 创建仪表盘布局
+
+仪表盘有一些可以在多个页面中共享的导航区域。在 Next.js 中，你可以使用一个特殊的文件 `layout.tsx` 来创建可以在多个页面中共享的 UI。让我们为仪表盘页面创建一个布局吧！
+
+在 `/dashboard` 文件夹内，添加一个名为 `layout.tsx` 的新文件，并粘贴如下代码：
+
+```tsx
+import SideNav from '@/app/ui/dashboard/sidenav';
+ 
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex h-screen flex-col md:flex-row md:overflow-hidden">
+      <div className="w-full flex-none md:w-64">
+        <SideNav />
+      </div>
+      <div className="flex-grow p-6 md:overflow-y-auto md:p-12">{children}</div>
+    </div>
+  );
+}
+```
+
+这段代码包含了几方面内容，我们一点一点看：
+
+首先，我们在布局中导入了 `<SideNav />` 组件。你在这个文件中导入的任何组件都会成为这个布局的一部分。
+
+`<Layout />` 组件接受一个 `children` 属性，这个子组件可以是一个页面或者是其他的布局。在我们的例子中，在 `/dashboard` 之下的页面会自动嵌套进 `<Layout />` 中，像下面这样：
+
+![shared-layout](./learn_nextjs_images/shared-layout.avif)
+
+保存更改，检查网页，确保一切运行正常。你应该会看到如下内容：
+
+![shared-layout-page](./learn_nextjs_images/shared-layout-page.avif)
+
+在 Next.js 中使用布局的其中一个好处就是方便导航，只有页面的组件会重新渲染而布局的不会，这就叫[部分渲染](https://nextjs.org/docs/app/building-your-application/routing/linking-and-navigating#3-partial-rendering)。
+
+![partial-rendering-dashboard](./learn_nextjs_images/partial-rendering-dashboard.avif)
+
+## 根布局
+
+在第三章，我们在另一个布局文件 `/app/layout.tsx` 中导入了一个 `Inter` 字体，如下
+
+```tsx
+import '@/app/ui/global.css';
+import { inter } from '@/app/ui/fonts';
+ 
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body className={`${inter.className} antialiased`}>{children}</body>
+    </html>
+  );
+}
+```
+
+这个是根布局（[root layout](https://nextjs.org/docs/app/building-your-application/routing/pages-and-layouts#root-layout-required)），是必需的。你在根布局中添加的任何 UI 都会在应用的 **所有** 页面上共享。你可以使用根布局来修改 `<html>` 和 `<body>` 标签，或者添加元数据（我们会在[之后的章节](#第十六章-添加元数据)中学习元数据）。
+
+# 第五章 在页面间导航
+
 
 # 第六章 设置数据库
+
+# 第十六章 添加元数据
