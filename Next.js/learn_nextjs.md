@@ -582,7 +582,7 @@ export default function Page() {
 > - 使用文件系统路由创建 `dashboard` 分页
 > - 理解文件夹和文件在创建新分页时的作用
 > - 创建一个嵌套的布局，以便在多个仪表盘分页中共享使用
-> - 理解什么是托管、部分渲染和根布局（root layout）。
+> - 理解什么是托管、部分渲染和根布局（root layout）
 
 ## 嵌套路由
 
@@ -711,7 +711,152 @@ export default function RootLayout({
 
 # 第五章 在页面间导航
 
+在上一章节，我们创建了仪表盘的布局和页面。现在让我们添加一些链接，来允许用户在不同的分页间跳转。
+
+> **本章我们会讲到……**
+> - 如何使用 `next/link` 组件
+> - 如何使用 `usePathname()` 钩子显示一个动态链接
+> - Next.js 的导航是如何运作的
+
+## 为什么要优化导航？
+
+要在不同的页面间建立链接，你通常会需要 HTML 的 `<a>` 标签。目前为止，侧边栏的链接就是用 `<a>` 链接的，但是观察一下，当你在主页、单据页、客户页之间跳转时，发生了什么？
+
+看到了吗？
+
+每次跳转，整个页面都刷新了！
+
+## `<Link>` 组件
+
+在 Next.js 中，你可以使用 `<Link />` 组件来链接应用中的不同页面。`<Link>` 允许你使用 JavaScript 实现[客户端导航](https://nextjs.org/docs/app/building-your-application/routing/linking-and-navigating#how-routing-and-navigation-works)。
+
+要使用 `<Link />` 组件，打开 `/app/ui/dashboard/nav-links.tsx`，从 `next/link` 导入 `Link` 组件，然后把 `<a>` 标签替换为 `<Link>`。
+
+```tsx
+import {
+  UserGroupIcon,
+  HomeIcon,
+  DocumentDuplicateIcon,
+} from '@heroicons/react/24/outline';
+import Link from 'next/link';
+ 
+// ...
+ 
+export default function NavLinks() {
+  return (
+    <>
+      {links.map((link) => {
+        const LinkIcon = link.icon;
+        return (
+          <Link
+            key={link.name}
+            href={link.href}
+            className="flex h-[48px] grow items-center justify-center gap-2 rounded-md bg-gray-50 p-3 text-sm font-medium hover:bg-sky-100 hover:text-blue-600 md:flex-none md:justify-start md:p-2 md:px-3"
+          >
+            <LinkIcon className="w-6" />
+            <p className="hidden md:block">{link.name}</p>
+          </Link>
+        );
+      })}
+    </>
+  );
+}
+```
+
+正如你所见，`Link` 组件的用法跟 `<a>` 很相似。
+
+保存更改，然后到浏览器查看网页。你现在在页面间导航应该就不会出现一整个页面都刷新的问题了。尽管这个应用的一部分是在服务器端渲染的，但是不会出现整个页面都刷新的问题了，就像一个网页应用一样。为什么会这样？
+
+## 自动的代码分割和预获取
+
+为了提升导航体验，Next.js 会根据段路由自动进行代码分割。这跟传统的 React [单页应用](https://developer.mozilla.org/en-US/docs/Glossary/SPA)不同，后者是在应用初始化时加载全部的代码。
+
+根据路由分割代码意味着页面之间是独立的。如果某一个页面报错了，剩下的页面依旧能正常工作。
+
+而且，在实际生产环境中，每当 [`<Link>`](https://nextjs.org/docs/api-reference/next/link) 组件出现在浏览器视窗中，Next.js 就会在后台自动 **预获取** 被链接页面的代码。当用户点击链接时，目标页面的代码早就在后台加载好了，这就是为什么页面间的切换好像是瞬间完成的。
+
+了解更多关于[导航](https://nextjs.org/docs/app/building-your-application/routing/linking-and-navigating#how-routing-and-navigation-works)的内容。
+
+## 模式：显示动态链接
+
+一个常见的 UI 模式是向用户显示一个动态的链接，来告诉用户他们现在在哪个页面上。要实现这一点，你需要从 URL 中获取到用户当前的地址路径。Next.js 提供了一个名叫 `userPathname()` 的钩子，你可以通过它获取地址路径并实现该模式。
+
+因为 [`userPathname()`](https://nextjs.org/docs/app/api-reference/functions/use-pathname) 是一个钩子，你需要把 `nav-links.tsx` 转换为一个客户端组件。在该文件顶端添加一个 React
+声明 `use client`，然后从 `next/navigation` 中导入 `usePathname()`：
+
+```tsx
+'use client';
+ 
+import {
+  UserGroupIcon,
+  HomeIcon,
+  InboxIcon,
+} from '@heroicons/react/24/outline';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+ 
+// ...
+```
+
+然后在 `<NavLinks />` 组件中把路径赋值给一个叫 `pathname` 的变量：
+
+```tsx
+export default function NavLinks() {
+  const pathname = usePathname();
+  // ...
+}
+```
+
+你可以使用我们在 [CSS 样式](#第二章-css-样式)那一章讲过的 `clsx` 库来根据链接是否激活这个条件应用不同的类名。当 `link.href` 跟 `pathname` 匹配的时候，链接文本应该变为蓝色，背景应该变为浅蓝。
+
+这是 `nav-links.tsx` 文件的最终代码：
+
+```tsx
+'use client';
+ 
+import {
+  UserGroupIcon,
+  HomeIcon,
+  DocumentDuplicateIcon,
+} from '@heroicons/react/24/outline';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import clsx from 'clsx';
+ 
+// ...
+ 
+export default function NavLinks() {
+  const pathname = usePathname();
+ 
+  return (
+    <>
+      {links.map((link) => {
+        const LinkIcon = link.icon;
+        return (
+          <Link
+            key={link.name}
+            href={link.href}
+            className={clsx(
+              'flex h-[48px] grow items-center justify-center gap-2 rounded-md bg-gray-50 p-3 text-sm font-medium hover:bg-sky-100 hover:text-blue-600 md:flex-none md:justify-start md:p-2 md:px-3',
+              {
+                'bg-sky-100 text-blue-600': pathname === link.href,
+              },
+            )}
+          >
+            <LinkIcon className="w-6" />
+            <p className="hidden md:block">{link.name}</p>
+          </Link>
+        );
+      })}
+    </>
+  );
+}
+```
+
+保存代码，然后查看网页。你应该会看到当前页面的链接是蓝色高亮。
 
 # 第六章 设置数据库
+
+
 
 # 第十六章 添加元数据
