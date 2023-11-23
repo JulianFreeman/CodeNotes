@@ -1247,7 +1247,7 @@ const {
 } = await fetchCardData(); // wait for fetchLatestInvoices() to finish
 ```
 
-这种模式倒不是说不对。有些情况下你的确需要这些瀑布，你希望等一个请求完全结束后再进行下一个请求，例如你可能需要先抓取用户的 ID 和头像，再抓取他们的好友列表。这种情况下，后一个请求依赖于前一个请求返回的数据。
+这种模式倒不是说不对。有些情况下你的确需要这些瀑布，你希望等一个请求完全结束后再进行下一个请求，例如你可能需要先抓取用户的 ID 和简介，再抓取他们的好友列表。这种情况下，后一个请求依赖于前一个请求返回的数据。
 
 然而，这种现象有时候也可能是无意的，并且会影响性能。
 
@@ -1285,5 +1285,139 @@ export async function fetchCardData() {
 但是，使用这种 JavaScript 模式有一个 **问题**：如果其中一个数据请求比其他几个慢怎么办？
 
 # 第八章 静态和动态渲染
+
+在上一章节，我们为仪表盘的预览页面抓取了数据。然而，我们也简单讨论了一下产生的两个局限：
+
+1. 这些数据请求无意中造成了网络瀑布。
+2. 仪表盘是静态的，因此有数据更新时不会呈现在应用上。
+
+> **本章我们会讲到……**
+> - 静态渲染是什么，为什么它能提升应用的性能
+> - 动态渲染是什么，什么时候用
+> - 让仪表盘变成动态的几种方法
+> - 模拟一个很慢的数据请求来看看会发生什么
+
+## 什么是静态渲染？
+
+静态渲染，是指数据抓取和渲染发生在服务器部署阶段，或者重新验证阶段。请求和渲染的结果可以缓存在[内容分发网络（CDN）](https://nextjs.org/docs/app/building-your-application/rendering/server-components#static-rendering-default)并稍后分发。
+
+![static-site-generation-2](./learn_nextjs_images/static-site-generation.avif)
+
+当用户访问你的网站时，缓存的数据就会被发送。静态渲染有以下几个好处：
+
+- **更快的网站**：预渲染的内容可以被缓存并且大范围发放。这确保世界各地的用户可以更快更稳定地访问网站的内容。
+- **降低服务器负载**：因为内容已经缓存了，服务器不需要为每一个用户请求动态生成数据。
+- **SEO**：预渲染的内容更便于搜索引擎爬虫建立索引。因为在页面加载时内容就已经存在了。这可以提高内容在搜索引擎中的排名。
+
+静态渲染对于**不需要数据**的 UI 或者 **在所有用户间共享数据** 的 UI 是很有用的，比如一篇静态的博客，或者一个产品页。但对于一个经常更新用户数据的仪表盘来说，这就不太合适了。
+
+与静态渲染相对的就是动态渲染。
+
+## 什么是动态渲染？
+
+动态渲染指的是内容在每次用户 **发送请求**（访问网页）的时候，由服务器重新渲染。动态渲染有以下几个好处：
+
+- **实时数据**：动态渲染允许应用展示实时或者经常更新的数据。
+- **特定用户的内容**：展示各个用户自己的数据就很容易了，比如仪表盘或者用户简介，然后根据用户行为更新数据。
+- **请求时信息**：动态渲染允许你获取只有在请求时才能知道的信息，比如 cookies，或者 URL 搜索参数。
+
+## 把仪表盘变成动态的
+
+默认情况下，`@vercel/postgres` 自己没有缓存功能。这就是说框架需要设定它自己的静态或者动态行为。
+
+你可以在服务器组件或者数据抓取函数中使用一个叫 `unstable_noStore` 的 Next.js API 来取消静态渲染。我们来试试：
+
+在 `data.ts` 文件中，从 `next/cache` 中导入 `unstable_noStore`，然后在数据抓取函数中先调用它：
+
+```ts
+// ...
+import { unstable_noStore as noStore } from 'next/cache';
+ 
+export async function fetchRevenue() {
+  // Add noStore() here to prevent the response from being cached.
+  // This is equivalent to in fetch(..., {cache: 'no-store'}).
+  noStore();
+ 
+  // ...
+}
+ 
+export async function fetchLatestInvoices() {
+  noStore();
+  // ...
+}
+ 
+export async function fetchCardData() {
+  noStore();
+  // ...
+}
+ 
+export async function fetchFilteredInvoices(
+  query: string,
+  currentPage: number,
+) {
+  noStore();
+  // ...
+}
+ 
+export async function fetchInvoicesPages(query: string) {
+  noStore();
+  // ...
+}
+ 
+export async function fetchFilteredCustomers(query: string) {
+  noStore();
+  // ...
+}
+ 
+export async function fetchInvoiceById(query: string) {
+  noStore();
+  // ...
+}
+```
+
+> **注意**：`unstable_noStore` 是一个试验 API，可能将来会改变，如果你想在项目中用一个更稳定的 API，可以试试[路由段配置选项](https://nextjs.org/docs/app/api-reference/file-conventions/route-segment-config) `export const dynamic = "force-dynamic"`。
+
+## 模拟一个很慢的数据抓取
+
+把仪表盘变为动态是一个很好的开始。然后，我们上一章节提到的问题依然存在。如果一个数据请求比其他的慢怎么办？
+
+让我们来模拟一个很慢的数据请求。在 `data.ts` 文件中，把 `fetchRevenue()` 中的 `console.log` 和 `setTimeout` 解注释。
+
+```ts
+export async function fetchRevenue() {
+  try {
+    // We artificially delay a response for demo purposes.
+    // Don't do this in production :)
+    console.log('Fetching revenue data...');
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+ 
+    const data = await sql<Revenue>`SELECT * FROM revenue`;
+ 
+    console.log('Data fetch completed after 3 seconds.');
+ 
+    return data.rows;
+  } catch (error) {
+    console.error('Database Error:', error);
+    throw new Error('Failed to fetch revenue data.');
+  }
+}
+```
+
+现在在一个新标签页访问 http://localhost:3000/dashboard/ ，你应该会看到页面花了很长时间加载。在终端中，你应该会看到如下信息：
+
+```text
+Fetching revenue data...
+Data fetch completed after 3 seconds.
+```
+
+这里我们添加了一个 3 秒的延迟来模拟一个很慢的数据请求。结果是在数据抓取的时候你整个页面都卡住了。
+
+这就是开发者要解决的一个常见问题：
+
+使用动态渲染的时候，**你的应用的响应速度是跟你那个最慢的数据请求速度一样的**。
+
+# 第九章 流
+
+
 
 # 第十六章 添加元数据
