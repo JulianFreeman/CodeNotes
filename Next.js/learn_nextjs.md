@@ -73,7 +73,7 @@ cd nextjs-dashboard
 
 让我们花些时间看看这个项目。
 
-## 文件夹结构
+### 文件夹结构
 
 你会发现这个项目有着如下的文件夹结构：
 
@@ -88,7 +88,7 @@ cd nextjs-dashboard
 
 你可以尽管浏览文件夹里的所有内容，如果有不懂的，也不用担心。
 
-## 占位数据
+### 占位数据
 
 当你构建用户界面的时候，有一些占位数据总是好的。如果还没有数据库或者 API 的话，你可以：
 
@@ -117,7 +117,7 @@ const invoices = [
 
 在[设置数据库](#第六章-设置数据库)的章节中，我们会使用这些数据来填充数据库（初始化数据库）。
 
-## TypeScript
+### TypeScript
 
 你可能也注意到了很多文件都有 `.ts` 或者 `.tsx` 后缀。这是因为这个项目是用 TypeScript 编写的，我们想要编写一个符合现代网站景观的教程。
 
@@ -767,7 +767,7 @@ export default function NavLinks() {
 
 保存更改，然后到浏览器查看网页。你现在在页面间导航应该就不会出现一整个页面都刷新的问题了。尽管这个应用的一部分是在服务器端渲染的，但是不会出现整个页面都刷新的问题了，就像一个网页应用一样。为什么会这样？
 
-## 自动的代码分割和预获取
+### 自动的代码分割和预获取
 
 为了提升导航体验，Next.js 会根据段路由自动进行代码分割。这跟传统的 React [单页应用](https://developer.mozilla.org/en-US/docs/Glossary/SPA)不同，后者是在应用初始化时加载全部的代码。
 
@@ -1417,6 +1417,91 @@ Data fetch completed after 3 seconds.
 使用动态渲染的时候，**你的应用的响应速度是跟你那个最慢的数据请求速度一样的**。
 
 # 第九章 流
+
+在上一章节，我们把仪表盘改成动态渲染了，我们也讨论了很慢的数据抓取是如何影响网页的性能的。让我们看看在数据请求很慢的情况下怎么优化用户体验。
+
+> **本章我们会讲到……**
+> - 流是什么，什么时候用
+> - 怎么用 `loading.tsx` 和 Suspense 实现流
+> - 加载骨架是什么
+> - 路由组是什么，什么时候用
+> - 把 Suspense 边界放在网页的哪里
+
+## 什么是流？
+
+流是一种数据传输技术，它可以把一个页面分成几个小“块”，然后从服务端一点点把这些块发送到（流到）用户端。
+
+![server-rendering-with-streaming](./learn_nextjs_images/server-rendering-with-streaming.avif)
+
+有了流，我们就可以防止一些很慢的数据抓取阻塞住我们的整个页面。这就可以让用户先看到页面的一部分，而不用等着所有的数据都加载完才能看到页面。
+
+![server-rendering-with-streaming-chart](./learn_nextjs_images/server-rendering-with-streaming-chart.avif)
+
+React 的组件模型可以很好地跟流技术适配，因为每一个组件都可以被视为一个 *块*。
+
+在 Next.js 中实现流有两种方式：
+
+1. 在页面层面使用 `loading.tsx` 文件。
+2. 对于特定的组件，使用 `<Suspense>`。
+
+让我们看看该怎么做。
+
+## 用 `loading.tsx` 流式加载整个页面
+
+在 `/app/dashboard` 文件夹中，添加一个名为 `loading.tsx` 的新文件：
+
+```tsx
+export default function Loading() {
+  return <div>Loading...</div>;
+}
+```
+
+刷新 http://localhost:3000/dashboard ，你应该会看到：
+
+![loading-page](./learn_nextjs_images/loading-page.avif)
+
+这里发生了如下几件事：
+
+1. `loading.tsx` 是一个建立在 Suspense 之上的特殊的 Next.js 文件。它允许你在数据还在加载时创建一个备用 UI 界面展示给用户。
+2. 因为 `<Sidebar>` 是静态的，所以它立刻就显示出来了。在数据还在加载时，用户依然可以点击侧边栏。
+3. 用户不需要等待页面全部加载完毕之后才能跳转走（这叫可中断跳转）。
+
+恭喜你，你刚刚实现了流！但是我们需要再做些什么来提升用户体验。让我们把 `Loading...` 这段文本替换为加载骨架。
+
+### 添加加载骨架
+
+加载骨架是一个简化版本的 UI 界面。很多网站都用它来作为占位 UI（备用 UI）来提示用户内容还在加载中。你在 `loading.tsx` 中嵌入的任何 UI 都会成为静态文件的一部分，并且先被发送。然后，其他的动态数据会一点点从服务端流向用户端。
+
+在 `loading.tsx` 文件中，导入一个叫 `<DashboardSkeleton>` 的新组件：
+
+```tsx
+import DashboardSkeleton from '@/app/ui/skeletons';
+ 
+export default function Loading() {
+  return <DashboardSkeleton />;
+}
+```
+
+然后刷新 http://localhost:3000/dashboard 你应该会看到如下界面：
+
+![loading-page-with-skeleton](./learn_nextjs_images/loading-page-with-skeleton.avif)
+
+### 解决路由组加载骨架的 bug
+
+现在，这个加载骨架也会应用到单据页面和用户页面。因为 `loading.tsx` 是一个比 `/invoices/page.tsx` 和 `/customers/page.tsx` 更高层的文件。
+
+我们可以用[路由组](https://nextjs.org/docs/app/building-your-application/routing/route-groups)修正这一点。在 `dashboard` 文件夹中创建一个名为 `/(overview)` 的文件夹，然后把 `loading.tsx` 和 `page.tsx` 放进去：
+
+![route-group](./learn_nextjs_images/route-group.avif)
+
+现在 `loading.tsx` 就只会出现在仪表盘的预览页面了。
+
+路由组允许你把一些文件组织进一些逻辑上的组，而不会影响 URL 路径结构。当你用圆括号 `()` 创建文件夹时，这个文件夹的名字不会出现在 URL 路径中，所以 `/dashboard/(overview)/page.tsx` 实际就是 `/dashboard`。
+
+这里我们用路由组来确保 `loading.tsx` 只应用到仪表盘预览页面。然而，你也可以使用路由组把应用分成不同的部分，比如 `(marketing)` 和 `(shop)` 等。
+
+### 流式传输一个组件
+
 
 
 
