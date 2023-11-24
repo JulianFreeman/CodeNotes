@@ -27,7 +27,7 @@
 - **优化**：如何优化图片、链接和字体。
 - **路由**：如何使用文件系统路由创建嵌套的布局和页面。
 - **数据抓取**：如何在 Vercel 上设置数据库，如何高效抓取和流式传输。
-- **检索和分页**：如何使用 URL 搜索参数实现检索和分页。
+- **搜索和分页**：如何使用 URL 搜索参数实现搜索和分页。
 - **更改数据**：如何使用 React 服务器操作更改数据，以及重新验证 Next.js 缓存。
 - **错误处理**：如何处理一般的和 `404` 错误。
 - **表单验证和访问**：如何做服务器端的表单验证以及提高可访问性的技巧。
@@ -582,7 +582,7 @@ export default function Page() {
 > - 使用文件系统路由创建 `dashboard` 分页
 > - 理解文件夹和文件在创建新分页时的作用
 > - 创建一个嵌套的布局，以便在多个仪表盘分页中共享使用
-> - 理解什么是托管、部分渲染和根布局（root layout）
+> - 理解什么是托管、局部渲染和根布局（root layout）
 
 ## 嵌套路由
 
@@ -682,7 +682,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
 ![shared-layout-page](./learn_nextjs_images/shared-layout-page.avif)
 
-在 Next.js 中使用布局的其中一个好处就是方便导航，只有页面的组件会重新渲染而布局的不会，这就叫[部分渲染](https://nextjs.org/docs/app/building-your-application/routing/linking-and-navigating#3-partial-rendering)。
+在 Next.js 中使用布局的其中一个好处就是方便导航，只有页面的组件会重新渲染而布局的不会，这就叫[局部渲染](https://nextjs.org/docs/app/building-your-application/routing/linking-and-navigating#3-partial-rendering)。
 
 ![partial-rendering-dashboard](./learn_nextjs_images/partial-rendering-dashboard.avif)
 
@@ -1425,7 +1425,7 @@ Data fetch completed after 3 seconds.
 > - 怎么用 `loading.tsx` 和 Suspense 实现流
 > - 加载骨架是什么
 > - 路由组是什么，什么时候用
-> - 把 Suspense 边界放在网页的哪里
+> - 要把网页的哪些部分用 Suspense 包起来
 
 ## 什么是流？
 
@@ -1502,7 +1502,365 @@ export default function Loading() {
 
 ### 流式传输一个组件
 
+目前，我们是在整个页面上应用流式传输的。但是，实际上我们可以有细粒度更高地控制，使用 React Suspense 流式传输特定的组件。
 
+Suspense 允许你可以推迟渲染部分应用页面，直到某些条件符合时才渲染（比如数据加载之后）。你可以把要动态渲染的组件用 Suspense 包起来。然后，把一个备用组件传递过去，作为动态组件加载时展示给用户的内容。
 
+如果你还记得 `fetchRevenue()`，它是那个把整个页面都拖垮的慢速数据请求。为了不阻塞整个页面，我们可以只把这个组件用 Suspense 设置为流式传输，而其他的页面 UI 都是立即呈现。
+
+要实现这点，我们需要把数据抓取函数放到组件中。让我们来更新一下代码：
+
+在 `/dashboard/(overview)/page.tsx` 中，把 `fetchRevenue()` 的所有实例都删除
+
+```tsx
+import { Card } from '@/app/ui/dashboard/cards';
+import RevenueChart from '@/app/ui/dashboard/revenue-chart';
+import LatestInvoices from '@/app/ui/dashboard/latest-invoices';
+import { lusitana } from '@/app/ui/fonts';
+import { fetchLatestInvoices, fetchCardData } from '@/app/lib/data'; // remove fetchRevenue
+ 
+export default async function Page() {
+  const revenue = await fetchRevenue // delete this line
+  const latestInvoices = await fetchLatestInvoices();
+  const {
+    numberOfInvoices,
+    numberOfCustomers,
+    totalPaidInvoices,
+    totalPendingInvoices,
+  } = await fetchCardData();
+ 
+  return (
+    // ...
+  );
+}
+```
+
+然后，从 React 导入 `<Suspense>`，用它把 `<RevenueChart />` 包起来。你可以把备用组件 `<RevenueChartSkeleton>` 传递过去。
+
+```tsx
+import { Card } from '@/app/ui/dashboard/cards';
+import RevenueChart from '@/app/ui/dashboard/revenue-chart';
+import LatestInvoices from '@/app/ui/dashboard/latest-invoices';
+import { lusitana } from '@/app/ui/fonts';
+import { fetchLatestInvoices, fetchCardData } from '@/app/lib/data';
+import { Suspense } from 'react';
+import { RevenueChartSkeleton } from '@/app/ui/skeletons';
+ 
+export default async function Page() {
+  const latestInvoices = await fetchLatestInvoices();
+  const {
+    numberOfInvoices,
+    numberOfCustomers,
+    totalPaidInvoices,
+    totalPendingInvoices,
+  } = await fetchCardData();
+ 
+  return (
+    <main>
+      <h1 className={`${lusitana.className} mb-4 text-xl md:text-2xl`}>
+        Dashboard
+      </h1>
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <Card title="Collected" value={totalPaidInvoices} type="collected" />
+        <Card title="Pending" value={totalPendingInvoices} type="pending" />
+        <Card title="Total Invoices" value={numberOfInvoices} type="invoices" />
+        <Card
+          title="Total Customers"
+          value={numberOfCustomers}
+          type="customers"
+        />
+      </div>
+      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-4 lg:grid-cols-8">
+        <Suspense fallback={<RevenueChartSkeleton />}>
+          <RevenueChart />
+        </Suspense>
+        <LatestInvoices latestInvoices={latestInvoices} />
+      </div>
+    </main>
+  );
+}
+```
+
+最后，在 `/app/ui/dashboard/revenue-chart.tsx` 文件中更新 `<RevenueChart>` 组件，让它自己抓取数据，而不用参数传递了：
+
+```tsx
+import { generateYAxis } from '@/app/lib/utils';
+import { CalendarIcon } from '@heroicons/react/24/outline';
+import { lusitana } from '@/app/ui/fonts';
+import { fetchRevenue } from '@/app/lib/data';
+ 
+// ...
+ 
+export default async function RevenueChart() { // Make component async, remove the props
+  const revenue = await fetchRevenue(); // Fetch data inside the component
+ 
+  const chartHeight = 350;
+  const { yAxisLabels, topLabel } = generateYAxis(revenue);
+ 
+  if (!revenue || revenue.length === 0) {
+    return <p className="mt-4 text-gray-400">No data available.</p>;
+  }
+ 
+  return (
+    // ...
+  );
+}
+```
+
+现在，刷新页面，你应该会看到仪表盘的其他信息都立刻显示了，只有 `<RevenueChart>` 展示了一个备用组件骨架。
+
+![loading-revenue-chart](./learn_nextjs_images/loading-revenue-chart.avif)
+
+### 练习：流式传输 `<LatestInvoices>`
+
+现在到你了！练习一下刚才学到的内容，把 `<LatestInvoices>` 组件改为流式传输。
+
+把 `fetchLatestInvoices()` 移动到 `<LatestInvoices>` 组件中，用 `<Suspense>` 把组件包起来，然后传递一个叫 `<LatestInvoicesSkeleton>` 的备用组件。
+
+当你做完后，展开下面的代码查看解决方案：
+
+> 解决方案如下（当然无法折叠啦~）
+
+`/app/dashboard/(overview)/page.tsx`
+
+```tsx
+import { Card } from '@/app/ui/dashboard/cards';
+import RevenueChart from '@/app/ui/dashboard/revenue-chart';
+import LatestInvoices from '@/app/ui/dashboard/latest-invoices';
+import { lusitana } from '@/app/ui/fonts';
+import { fetchCardData } from '@/app/lib/data'; // Remove fetchLatestInvoices
+import { Suspense } from 'react';
+import {
+  RevenueChartSkeleton,
+  LatestInvoicesSkeleton,
+} from '@/app/ui/skeletons';
+ 
+export default async function Page() {
+  // Remove `const latestInvoices = await fetchLatestInvoices()`
+  const {
+    numberOfInvoices,
+    numberOfCustomers,
+    totalPaidInvoices,
+    totalPendingInvoices,
+  } = await fetchCardData();
+ 
+  return (
+    <main>
+      <h1 className={`${lusitana.className} mb-4 text-xl md:text-2xl`}>
+        Dashboard
+      </h1>
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <Card title="Collected" value={totalPaidInvoices} type="collected" />
+        <Card title="Pending" value={totalPendingInvoices} type="pending" />
+        <Card title="Total Invoices" value={numberOfInvoices} type="invoices" />
+        <Card
+          title="Total Customers"
+          value={numberOfCustomers}
+          type="customers"
+        />
+      </div>
+      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-4 lg:grid-cols-8">
+        <Suspense fallback={<RevenueChartSkeleton />}>
+          <RevenueChart />
+        </Suspense>
+        <Suspense fallback={<LatestInvoicesSkeleton />}>
+          <LatestInvoices />
+        </Suspense>
+      </div>
+    </main>
+  );
+}
+```
+
+`<LatestInvoices>` 组件记得删除参数！
+
+`/app/ui/dashboard/latest-invoices.tsx`
+
+```tsx
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
+import clsx from 'clsx';
+import Image from 'next/image';
+import { lusitana } from '@/app/ui/fonts';
+import { fetchLatestInvoices } from '@/app/lib/data';
+ 
+export default async function LatestInvoices() { // Remove props
+  const latestInvoices = await fetchLatestInvoices();
+ 
+  return (
+    // ...
+  );
+}
+```
+
+## 组件编组
+
+很好，你已经坚持到这儿了！现在你需要把 `<Card>` 组件也用 Suspense 包起来。你可以为每一个卡片单独抓取数据，但是这样会让卡片有一种一个个 *弹出* 的效果，可能会让用户看上去不舒服。
+
+所以，你打算怎么解决这个问题呢？
+
+要创建一种更 *交错* 的效果，我们可以用一个包装组件把卡片包起来。这就是说，静态的 `<Sidebar />` 先出现，然后卡片出现：
+
+在 `/app/dashboard/page.tsx` 文件中，
+
+1. 删除 `<Card>` 组件。
+2. 删除 `fetchCardData()` 函数。
+3. 导入一个新的 **包装** 组件 `<CardWrapper />`。
+4. 到一个新的 **骨架** 组件 `<CardSkeleton />`。
+5. 用 Suspense 把 `<CardWrapper />` 包起来。
+
+```tsx
+import CardWrapper from '@/app/ui/dashboard/cards';
+// ...
+import {
+  RevenueChartSkeleton,
+  LatestInvoicesSkeleton,
+  CardsSkeleton,
+} from '@/app/ui/skeletons';
+ 
+export default async function Page() {
+  return (
+    <main>
+      <h1 className={`${lusitana.className} mb-4 text-xl md:text-2xl`}>
+        Dashboard
+      </h1>
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <Suspense fallback={<CardsSkeleton />}>
+          <CardWrapper />
+        </Suspense>
+      </div>
+      // ...
+    </main>
+  );
+}
+```
+
+然后打开 `/app/ui/dashboard/cards.tsx`，导入 `fetchCardData()` 函数，在 `<CardWrapper />` 组件中调用。确保你把这个组件中的必需代码都解注释了。
+
+```tsx
+// ...
+import { fetchCardData } from '@/app/lib/data';
+ 
+// ...
+ 
+export default async function CardWrapper() {
+  const {
+    numberOfInvoices,
+    numberOfCustomers,
+    totalPaidInvoices,
+    totalPendingInvoices,
+  } = await fetchCardData();
+ 
+  return (
+    <>
+      <Card title="Collected" value={totalPaidInvoices} type="collected" />
+      <Card title="Pending" value={totalPendingInvoices} type="pending" />
+      <Card title="Total Invoices" value={numberOfInvoices} type="invoices" />
+      <Card
+        title="Total Customers"
+        value={numberOfCustomers}
+        type="customers"
+      />
+    </>
+  );
+}
+```
+
+刷新页面，你应该会看到所有的卡片都在同时加载进来。当你想让多个组件同时加载的时候，可以使用这种模式。
+
+## 决定在哪里放置 Suspense
+
+在哪里放置 Suspense 取决于几件事：
+
+1. 页面流式传输时，你想让用户看到什么。
+2. 哪些内容要优先。
+3. 组件是否依赖于数据抓取。
+
+看一看你的仪表盘页面，有哪些地方你想改一改的吗？
+
+不用担心，这个没有标准答案。
+
+- 你可以把 **整个页面** 都用流式传输，就像我们用 `loading.tsx` 那样，不过如果某个数据抓取很慢，那就会让整个页面的加载时间变长。
+- 你可以对 **每个组件** 单独用流式传输，但这会让 UI 组件 *弹射* 到屏幕上。
+- 你可以通过流式传输不同的 **页面区域** 来创建 *交错* 效果，但是这需要你创建包装组件。
+
+在哪里放置 Suspense 会根据应用的不同而不同。通常来说，我们会把数据抓取放到需要它的组件中，然后把组件用 Suspense 包起来。但是如果你想按照页面区域流式传输，或者直接流式传输整个页面，这也没什么错，只要你的应用需要。
+
+大胆去使用 Suspense 吧，看看哪个方案效果更好。这是个十分强大的 API，可以帮助我们创建更愉悦的用户体验。
+
+## 前瞻
+
+流式传输和服务器组件为我们的数据抓取和加载状态提供了新的方式，并最终以提升用户体验为目标。
+
+在下一章，我们会学习局部预渲染，一种依托于流式传输建立的新的 Next.js 渲染模型。
+
+# 第十章 局部预渲染（可选）
+
+> 局部预渲染是一个 Next.js 14 引入的试验功能。随着这项功能逐渐趋于稳定，本页面的内容可能会发生变化。如果你不想使用试验功能，可以跳过这一章节。该章节不是学习本教程的必需章节。
+
+> **本章我们会讲到……**
+> - 局部预渲染是什么
+> - 它是怎么工作的
+
+## 将静态和动态内容结合起来
+
+现在，如果你在页面中调用一个[动态函数](https://nextjs.org/docs/app/building-your-application/routing/route-handlers#dynamic-functions)（比如 `noStore()` 或者 `cookies()` 等），你的整个页面都会变成动态的。
+
+这其实跟现在大多数网站的构建方式一致，在你为 **整个网站** 或者 **特定页面** 选择渲染方式时，你只能选择要么是静态的，要么是动态的。
+
+但是，大多数页面并不是全静态或者全动态。你的页面可能既有静态内容也有动态内容。比如说，你有一个社交媒体平台，上面的贴子是静态的，但贴子的点赞数是动态的。或者一个电子商务网站，上面的产品细节是静态的，但用户的购物车是动态的。
+
+回到我们的仪表盘页面，哪些组件你认为是静态的，哪些又是动态的？
+
+当你想好后，可以展开下面的内容，看看我们怎么划分仪表盘页面。
+
+> 解决方案如下（当然无法折叠啦~）
+
+![dashboard-static-dynamic-components](./learn_nextjs_images/dashboard-static-dynamic-components.avif)
+
+- `<SideNav>` 组件既不依赖于数据，也不是特定于某个用户的，因此是 **静态** 的。
+- `<Page>` 中的组件依赖于数据，会经常变化，而且有特定于用户的内容，因此是 **动态** 的。
+
+## 局部预渲染是什么？
+
+在 Next.js 14 中，有一个新的预览版渲染模型，叫 **局部预渲染**。它是一个试验功能，允许你在渲染页面时使用一个静态的加载外壳，同时保持某些部分是动态的。换句话说，你可以把页面的动态部分隔离出来。
+
+![thinking-in-ppr](./learn_nextjs_images/thinking-in-ppr.avif)
+
+当用户访问页面时：
+
+- 一个静态的页面 *外壳* 先渲染，这会加快初次加载的速度。
+- 这个外壳会留下一些 *洞*，给那些动态内容异步加载。
+- 这些异步的内容是并行加载的，减少了整个页面的加载时间。
+
+这跟咱们编写的应用不同，咱们的页面要么是全静态的，要么是全动态的。
+
+局部预渲染把极快的静态内容分发和全部的动态功能结合在了一起。我们相信它有[成为网页应用默认渲染模型](https://vercel.com/blog/partial-prerendering-with-next-js-creating-a-new-default-rendering-model)的潜力，同时带来最好的静态网站生成和动态内容分发。
+
+## 局部预渲染是怎么工作的？
+
+局部预渲染利用了 React 的并发 API，使用 Suspense 来延迟部分页面的渲染，直到它们符合某种条件（比如数据加载完了）。
+
+备用 UI 是跟其他静态内容一起待在初始化的静态文件中。在构建阶段（或者重新验证阶段），页面的静态内容会 *预渲染*，然后剩下的会延后，直到用户访问这些页面才渲染。
+
+值得一提的是，把一个组件包进 Suspense 中并不会把这个组件变成动态的（还记得你是通过 `unstable_noStore` 来实现这点的），Suspense 只是页面中静态和动态内容的一个分界线。
+
+关于局部预渲染很好的一方面是，使用它时你不需要额外修改代码。只要你是用 Suspense 在页面中包裹动态内容的，Next.js 就会知道你页面的哪部分内容是静态的，哪部分是动态的。
+
+> **提示**：要学习更多关于如何配置局部预渲染，你可以查看[局部预渲染文档](https://nextjs.org/docs/app/api-reference/next-config-js/partial-prerendering)，或者尝试[局部预渲染模板和演示](https://vercel.com/templates/next.js/partial-prerendering-nextjs)。请牢记，这个功能是 **试验性** 的，还 **不能用于生产环境部署中**。
+
+## 总结
+
+回顾一下，在我们的应用中，我们做了如下几件事来优化数据抓取：
+
+1. 把数据库创建在跟应用代码同一区域，以降低服务器和数据库之间的延迟。
+2. 用 React 服务器组件在服务器上抓取数据。这可以让你把重要的数据抓取和逻辑保留在服务器端，减少用户端的 JavaScript 捆绑包，同时防止数据库密钥暴露给用户。
+3. 使用 SQL 只抓取你需要的数据，减少每次请求时的数据传输量，也减少 JavaScript 需要在内存中处理的数据量。
+4. 用 JavaScript 并行抓取数据——在需要时这么做。
+5. 实现流式传输以防止慢速的数据抓取阻塞住整个页面，也让用户可以在数据加载完之前就能与界面 UI 交互。
+6. 把数据抓取函数移动到需要它们的组件中，这样可以把页面中需要动态内容的部分隔离开，以便使用局部预渲染。
+
+下一章，我们将会学习两种你在抓取数据时可能会需要的模式：搜索和分页。
+
+# 第十一章 添加搜索和分页 
 
 # 第十六章 添加元数据
