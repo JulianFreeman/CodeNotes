@@ -2,7 +2,7 @@
 
 ## 4.1 文件处理命令
 
-### 第 1.1 节 命令格式与目录处理命令 `ls`
+### 4.1.1 命令格式与目录处理命令 `ls`
 
 使用 `ls -l /home/julian` 显示的是该目录下文件和目录的信息，要想查看该目录本身的信息，可以用 `-d` 参数。
 
@@ -25,7 +25,7 @@ julian@ubuntu2204:~$ ls -ld /home/julian
 drwxr-x--- 14 julian julian 4096 Nov 24 13:31 /home/julian
 ```
 
-### 第 1.2 节 目录处理命令
+### 4.1.2 目录处理命令
 
 #### `mkdir`
 
@@ -208,10 +208,148 @@ julian@ubuntu2204:~/Documents$ tree
 
 其实，把上面的分层结构中的“复制”改为“移动”就符合 `mv` 的情况了，无论源路径是单个还是多个，都符合。
 
+### 4.1.3 文件处理命令
 
+#### `cat`
 
+`cat` 就是打印 **所有** 文件内容，没法分页，也没法打印局部。其 `-n` 参数指的是打印时 **添加行号**。
+
+直接用 `batcat`（`sudo apt install bat`）代替了。
+
+#### 命令行查看文档的一些操作
+
+> `more` 好像也可以往上翻页。
+
+使用 `less` 或者 `man` 之类的命令在命令行查看帮助文档时，
+
+- 敲 `/`，输入要搜索的文本，回车，文档内能匹配的文本会高亮，此时敲 `n` 可以查看下一个匹配，敲 `N` 可以查看上一个匹配（`Shift+n`）
+
+> `vim` 也可以，不过这个可以单独讲了。
+
+### 4.1.4 链接命令
+
+`ln -s` 可以创建软链接，不过指定源路径时必须用 **绝对路径**，不能用相对路径。使用相对路径建立的软链接用 `ls` 看是红色的，也无法读取，可能意味着无效。用绝对路径创建的软链接显示蓝色，可以读取，是有效的。
+
+`ln` 创建硬链接则没有这个要求，相对路径也可以。
 
 ## 4.2 权限管理命令
+
+### 4.2.1 权限管理命令 `chmod`
+
+同时进行多种授权时用逗号隔开：
+
+```text
+julian@ubuntu2204:~/Documents$ ls -l ./abc/issue.cp 
+-rw-r--r-- 2 julian julian 26 Nov 24 20:39 ./abc/issue.cp
+
+julian@ubuntu2204:~/Documents$ chmod g+w,o-r ./abc/issue.cp 
+
+julian@ubuntu2204:~/Documents$ ls -l ./abc/issue.cp 
+-rw-rw---- 2 julian julian 26 Nov 24 20:39 ./abc/issue.cp
+```
+
+授权按照先后顺序进行，比如上例，`g+w,o-r` 表示先给所属组加写权限，再给其他人减读权限。这样如果权限的设置前后有冲突，以在后的为准。
+
+当然，用数字就没这些冲突了：
+
+```text
+julian@ubuntu2204:~/Documents$ ls -l ./abc/issue.cp 
+-rw-rw---- 2 julian julian 26 Nov 24 20:39 ./abc/issue.cp
+
+julian@ubuntu2204:~/Documents$ chmod 644 ./abc/issue.cp 
+
+julian@ubuntu2204:~/Documents$ ls -l ./abc/issue.cp 
+-rw-r--r-- 2 julian julian 26 Nov 24 20:39 ./abc/issue.cp
+```
+
+文件或目录的权限只有其 **所有者和 root 用户** 可以修改。
+
+#### 权限对文件和目录的含义
+
+|权限|对文件|对目录|
+|--:|--|--|
+|读权限 `r`|可以查看文件内容|可以列出目录内容|
+|写权限 `w`|可以修改文件内容|可以在目录创建、删除（也就是修改目录里的内容）|
+|执行权限 `x`|可以执行文件|可以进入目录|
+
+可能把目录理解为记录了其内所有文件和目录名称的名单文件，就好理解对目录的读写权限的含义了。读就是能看到名单文件的内容，也就是目录里有什么文件和目录，写就是修改这个名单文件，也就是修改目录里的文件和目录，即创建或删除。
+
+**目录的读和执行权限都是同时出现的**，否则不能正常使用。
+
+### 4.2.2 其他权限管理命令
+
+#### `chown`
+
+只有 root 用户可以修改文件的所有者，所有者自己都不行。
+
+`chown` 文档原话：
+
+- `chown` 修改给定的每一个文件的所有者和/或所属组。
+- 如果指定了用户名，这个用户名就被修改为文件的所有者，文件的所属组不变。
+
+```text
+root@ubuntu2204:/tmp/abc# ls -dl def/
+drwxrwxr-x 2 karl karl 4096 Nov 24 23:03 def/
+
+root@ubuntu2204:/tmp/abc# chown julian def/
+
+root@ubuntu2204:/tmp/abc# ls -dl def/
+drwxrwxr-x 2 julian karl 4096 Nov 24 23:03 def/
+```
+
+- 如果用户名后面跟着一个冒号和一个组名，中间没有空格，那么文件的所属组也会改变。
+
+```text
+root@ubuntu2204:/tmp/abc# ls -dl ghi/
+drwxrwxr-x 2 karl karl 4096 Nov 24 23:13 ghi/
+
+root@ubuntu2204:/tmp/abc# chown julian:julian ghi/
+
+root@ubuntu2204:/tmp/abc# ls -dl ghi/
+drwxrwxr-x 2 julian julian 4096 Nov 24 23:13 ghi/
+```
+
+- 如果用户名后面有冒号但没有指定组名，那么文件的所有者改为该用户，所属组改为该用户的登录组（login group）。
+
+```text
+root@ubuntu2204:/tmp/abc# ls -dl jkl/
+drwxrwxr-x 2 karl karl 4096 Nov 24 23:13 jkl/
+
+root@ubuntu2204:/tmp/abc# chown julian: jkl/
+
+root@ubuntu2204:/tmp/abc# ls -dl jkl/
+drwxrwxr-x 2 julian julian 4096 Nov 24 23:13 jkl/
+```
+
+- 如果有冒号和组名，但没有指定用户名，那么只有文件的所属组被改变，这种情况下 `chown` 就跟 `chgrp` 作用一样了。
+
+```text
+root@ubuntu2204:/tmp/abc# ls -dl mno/
+drwxrwxr-x 2 karl karl 4096 Nov 24 23:13 mno/
+
+root@ubuntu2204:/tmp/abc# chown :julian mno/
+
+root@ubuntu2204:/tmp/abc# ls -dl mno/
+drwxrwxr-x 2 karl julian 4096 Nov 24 23:13 mno/
+```
+
+- 如果只给了一个冒号，或者啥也没给，那么什么都不会改变。
+
+#### `chgrp`
+
+修改所属组就很简单了，当然也只有 root 用户有权限修改。
+
+```text
+root@ubuntu2204:/tmp/abc# ls -dl mno/
+drwxrwxr-x 2 karl julian 4096 Nov 24 23:13 mno/
+
+root@ubuntu2204:/tmp/abc# chgrp karl mno/
+
+root@ubuntu2204:/tmp/abc# ls -dl mno/
+drwxrwxr-x 2 karl karl 4096 Nov 24 23:13 mno/
+```
+
+
 
 ## 4.3 文件搜索命令
 
