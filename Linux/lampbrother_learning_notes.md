@@ -228,9 +228,13 @@ julian@ubuntu2204:~/Documents$ tree
 
 ### 4.1.4 链接命令
 
-`ln -s` 可以创建软链接，不过指定源路径时必须用 **绝对路径**，不能用相对路径。使用相对路径建立的软链接用 `ls` 看是红色的，也无法读取，可能意味着无效。用绝对路径创建的软链接显示蓝色，可以读取，是有效的。
+`ln -s [源路径] [目标路径]` 可以创建软链接。
 
-`ln` 创建硬链接则没有这个要求，相对路径也可以。
+如果目标路径就在当前的工作目录中，则源路径是相对路径或者绝对路径都可以。
+
+如果目标路径不在当前的工作目录中，则源路径必须是绝对路径，否则软链接不生效。
+
+`ln` 创建硬链接则好像没有这个要求。不过硬链接只能作用于文件，且不能跨分区。
 
 ## 4.2 权限管理命令
 
@@ -349,11 +353,305 @@ root@ubuntu2204:/tmp/abc# ls -dl mno/
 drwxrwxr-x 2 karl karl 4096 Nov 24 23:13 mno/
 ```
 
+#### `umask`
 
+`umask` 设定的是创建文件时的初始权限。加 `-S` 参数可以以更直观的方式显示。
+
+```text
+julian@ubuntu2204:~/Documents$ umask -S
+u=rwx,g=rwx,o=rx
+```
+
+这意味着创建新的目录，其初始权限为 `rwxrwxr-x`。因为 Linux 规定缺省权限创建的新文件不能有执行权限，因此默认新文件的初始权限为 `rw-rw-r--`。
 
 ## 4.3 文件搜索命令
 
+### 4.3.1 文件搜索命令 `find`
+
+#### 按名称查找
+
+名称全匹配：
+
+```text
+root@ubuntu2204:~# find /etc -name init
+/etc/init
+/etc/apparmor/init
+```
+
+名称包含匹配：
+
+```text
+root@ubuntu2204:~# find /etc -name *init*
+/etc/init
+/etc/security/namespace.init
+/etc/apparmor/init
+/etc/gdb/gdbinit
+/etc/gdb/gdbinit.d
+/etc/X11/xinit
+/etc/X11/xinit/xinitrc
+...
+```
+
+名称不区分大小写：
+
+```text
+root@ubuntu2204:~# find /etc -iname init
+/etc/init
+/etc/apparmor/init
+/etc/gdm3/Init
+```
+
+#### 按大小查找
+
+`-size` 后的参数的单位是块，1 个块是 512B，因此 204800 个块是 204800 * 512B = 100MB 大小，加号代表大于，减号代表小于
+
+```text
+root@ubuntu2204:~# find / -size +204800
+/snap/firefox/2987/usr/lib/firefox/libxul.so
+/snap/gnome-42-2204/141/usr/lib/x86_64-linux-gnu/libLLVM-15.so.1
+/snap/gnome-42-2204/120/usr/lib/x86_64-linux-gnu/libLLVM-15.so.1
+...
+
+root@ubuntu2204:~# ls -lh /snap/firefox/2987/usr/lib/firefox/libxul.so
+-rwxr-xr-x 1 root root 138M Aug  7 06:31 /snap/firefox/2987/usr/lib/firefox/libxul.so
+```
+
+#### 按用户或组查找
+
+`-user` 按照所有者查找，`-group` 按照所属组查找。
+
+#### 按时间查找
+
+`-amin` 访问文件时间（access），`-cmin` 修改文件属性时间（change），`-mmin` 修改文件内容时间（modify），后面的数字单位都是分钟，加号代表超过这个时间，减号代表在这个时间之内
+
+下例表示 `/etc` 目录中 100 分钟之内修改过文件属性的文件
+
+```text
+root@ubuntu2204:~# find /etc -cmin -100
+/etc/cups
+/etc/cups/subscriptions.conf
+/etc/cups/subscriptions.conf.O
+```
+
+#### 结合多个条件查找
+
+`-a` 表示 and，即多个条件同时满足
+
+下例表示查找大小大于 80MB 同时小于 100MB 的文件
+
+```text
+root@ubuntu2204:~# find / -size +163840 -a -size -204800
+/snap/gnome-3-38-2004/143/usr/lib/x86_64-linux-gnu/libLLVM-12.so.1
+...
+
+root@ubuntu2204:~# ls -hl /snap/gnome-3-38-2004/143/usr/lib/x86_64-linux-gnu/libLLVM-12.so.1
+-rw-r--r-- 1 root root 88M Mar  8  2022 /snap/gnome-3-38-2004/143/usr/lib/x86_64-linux-gnu/libLLVM-12.so.1
+```
+
+`-o` 表示 or，即多个条件满足一个即可
+
+#### 按类型查找
+
+`-type` 可以接 `f`（文件），`d`（目录），`l`（软链接）
+
+下例表示查找名称为 `init` 开头的目录
+
+```text
+root@ubuntu2204:~# find /etc -name init* -a -type d
+/etc/init
+/etc/apparmor/init
+/etc/init.d
+/etc/initramfs-tools
+/etc/initramfs-tools/scripts/init-premount
+/etc/initramfs-tools/scripts/init-bottom
+/etc/initramfs-tools/scripts/init-top
+```
+
+#### 查找后执行
+
+`-exec` 后接要执行的命令，前面查找的结果用 `{}` 替换，最后加一个 `\;`
+
+下例查找 `/etc` 目录下所有以 `init` 开头的目录后执行 `ls -dl` 列举了它们的属性
+
+```text
+root@ubuntu2204:~# find /etc -name init* -a -type d -exec ls -dl {} \;
+drwxr-xr-x 2 root root 4096 Nov 24 11:49 /etc/init
+drwxr-xr-x 3 root root 4096 Aug  7 19:53 /etc/apparmor/init
+drwxr-xr-x 2 root root 4096 Nov 24 12:22 /etc/init.d
+drwxr-xr-x 5 root root 4096 Nov 24 12:22 /etc/initramfs-tools
+drwxr-xr-x 2 root root 4096 Jun 14 03:54 /etc/initramfs-tools/scripts/init-premount
+drwxr-xr-x 2 root root 4096 Jun 14 03:54 /etc/initramfs-tools/scripts/init-bottom
+drwxr-xr-x 2 root root 4096 Jun 14 03:54 /etc/initramfs-tools/scripts/init-top
+```
+
+将 `-exec` 替换为 `-ok` 会在对每一个查找到的结果执行命令前进行确认，通常如果查找后执行的是删除命令，`-ok` 可能会有用。
+
+#### 按 i 结点查找
+
+`-inum` 可以按照文件结点查找。
+
+如果有一个名称很怪的文件，不知道怎么手打出来，此时可以先查看其 i 结点号，然后用 `find` 找到后再执行某些操作
+
+```text
+root@ubuntu2204:/tmp/abc# ls -i
+655376 'weird name file'
+
+root@ubuntu2204:/tmp/abc# find . -inum 655376 -exec cat {} \;
+pretend this is a file with a weird name
+```
+
+同时使用 i 结点查找也能找到一块分区内某一个文件的所有硬链接。
+
+### 4.3.2 其他搜索命令
+
+#### `locate`
+
+在 Ubuntu 22.04.3 中这个命令没有默认安装，需要安装 `plocate` 包。
+
+使用前先用 `updatedb` 命令更新索引库，默认的索引文件在 `/var/lib/plocate/plocate.db`。
+
+`locate` 区分大小写，但并不是全匹配的
+
+```text
+julian@ubuntu2204:~/temp$ locate to_be
+/home/julian/temp/to_be_or_not
+```
+
+`-i` 可以不区分大小写
+
+```text
+julian@ubuntu2204:~/temp$ locate -i to_be
+/home/julian/temp/TO_BE_OR_NOT
+/home/julian/temp/to_be_or_not
+```
+
+`locate` 默认匹配的是全路径，也就是说，只要一个目录名符合条件，该目录下的所有文件和目录都符合条件，因为它们的路径中一定会包含这个符合条件的父目录
+
+```text
+julian@ubuntu2204:~/temp$ tree
+.
+├── to_be
+│   ├── bill.t
+│   └── shakes.txt
+├── to_be_or_not
+└── TO_BE_OR_NOT
+
+1 directory, 4 files
+julian@ubuntu2204:~/temp$ locate to_be
+/home/julian/temp/to_be
+/home/julian/temp/to_be_or_not
+/home/julian/temp/to_be/bill.t
+/home/julian/temp/to_be/shakes.txt
+```
+
+`-b` 参数可以设置为只匹配文件名或目录名
+
+```text
+julian@ubuntu2204:~/temp$ locate -b to_be
+/home/julian/temp/to_be
+/home/julian/temp/to_be_or_not
+```
+
+`-c` 参数可以只计数而不罗列所有项
+
+```text
+julian@ubuntu2204:~/temp$ locate -bc init
+3070
+```
+
+有些路径 `locate` 并不会索引，比如 `/tmp` 目录。
+
+#### `which`
+
+搜索命令文件的绝对路径
+
+```text
+julian@ubuntu2204:~/temp$ which ls
+/usr/bin/ls
+```
+
+#### `whereis`
+
+搜素命令文件的绝对路径和该命令文档的绝对路径
+
+```text
+julian@ubuntu2204:~/temp$ whereis ls
+ls: /usr/bin/ls /usr/share/man/man1/ls.1.gz
+```
+
+#### `grep`
+
+文件内容查找命令
+
+```text
+julian@ubuntu2204:~/temp$ grep "to be" to_be_or_not 
+So this is a to be or not to be question
+so to be or not to be ?
+
+julian@ubuntu2204:~/temp$ grep so to_be_or_not 
+so to be or not to be ?
+```
+
+同样默认区分大小写，加 `-i` 不区分
+
+```text
+julian@ubuntu2204:~/temp$ grep -i so to_be_or_not 
+So this is a to be or not to be question
+so to be or not to be ?
+```
+
+`-v` 反选
+
+```text
+julian@ubuntu2204:~/temp$ grep -vi so to_be_or_not 
+yes you're right.
+nah, this is only a text, don't be serious
+```
+
 ## 4.4 帮助命令
+
+`man` 命令不仅可以看命令的帮助文档，也可以看配置文件的帮助文档。比如 `man services` 会打开 `/etc/services` 配置文件的帮助文档。
+
+查看 `passwd` 会发现它即是一个命令，也是一个配置文件
+
+```text
+julian@ubuntu2204:~/temp$ whereis passwd
+passwd: /usr/bin/passwd /etc/passwd /usr/share/man/man1/passwd.1.gz /usr/share/man/man1/passwd.1ssl.gz /usr/share/man/man5/passwd.5.gz
+```
+
+此时调用 `man passwd` 默认显示的是命令的帮助文档，如果想看配置文件的帮助文档，可以用 `man 5 passwd`。
+
+Linux 的帮助文档中 `1` 表示命令的帮助文档，`5` 表示配置文件的帮助文档。
+
+`whatis` 可以查看命令和配置文件的 *一行* 帮助信息。
+
+`apropos` 可以检索帮助文档
+
+```text
+julian@ubuntu2204:~/temp$ whatis apropos
+apropos (1)          - search the manual page names and descriptions
+
+julian@ubuntu2204:~/temp$ apropos passwd
+chgpasswd (8)        - update group passwords in batch mode
+chpasswd (8)         - update passwords in batch mode
+fgetpwent_r (3)      - get passwd file entry reentrantly
+getpwent_r (3)       - get passwd file entry reentrantly
+gpasswd (1)          - administer /etc/group and /etc/gshadow
+grub-mkpasswd-pbkdf2 (1) - generate hashed password for GRUB
+openssl-passwd (1ssl) - compute password hashes
+pam_localuser (8)    - require users to be listed in /etc/passwd
+passwd (1)           - change user password
+passwd (1ssl)        - OpenSSL application commands
+passwd (5)           - the password file
+passwd2des (3)       - RFS password encryption
+update-passwd (8)    - safely update /etc/passwd, /etc/shadow and /etc/group
+```
+
+有些 Shell 内置命令无法用 `man` 查看帮助文档，比如 `cd`。
+
+用 `help` 可以查看内置命令的帮助文档。比如 `help cd`。
+
+比如 `help if` 也是可以的。
 
 ## 4.5 用户管理命令
 
