@@ -655,7 +655,308 @@ update-passwd (8)    - safely update /etc/passwd, /etc/shadow and /etc/group
 
 ## 4.5 用户管理命令
 
+`useradd` 是一个更底层的命令，常规添加用户应该用 `adduser`。
+
+`adduser` 可以创建普通用户，创建系统用户，创建普通组，创建系统组，把一个存在的用户添加到一个存在的组。
+
+`passwd` 可以修改用户的密码。普通用户只能修改自己的密码，而且还要符合复杂度的要求，但是 root 用户可以修改所有人的密码，且不用遵守复杂度要求。
+
+`who` 可以查看现在有多少个用户在登录。
+
+`w` 可以查看更多信息。其展示的信息都是什么意思，可以查看帮助文档 `man w`。
+
 ## 4.6 压缩解压命令
+
+### `gzip`
+
+后缀一般为 .gz 的压缩文件。关于 `gzip` 的命令帮助可以查看 `gzip --help`。
+
+压缩文件
+
+```text
+julian@ubuntu2204:~/temp$ ls
+lorem
+
+julian@ubuntu2204:~/temp$ gzip lorem 
+
+julian@ubuntu2204:~/temp$ ls
+lorem.gz
+```
+
+加 `-k` 保留源文件
+
+```text
+julian@ubuntu2204:~/temp$ ls
+lorem
+
+julian@ubuntu2204:~/temp$ gzip -k lorem 
+
+julian@ubuntu2204:~/temp$ ls
+lorem  lorem.gz
+```
+
+`-d` 解压文件（与 `gunzip` 相同），加 `-k` 也是保留源文件
+
+```text
+julian@ubuntu2204:~/temp$ ls
+lorem.gz
+
+julian@ubuntu2204:~/temp$ gzip -dk lorem.gz 
+
+julian@ubuntu2204:~/temp$ ls
+lorem  lorem.gz
+```
+
+`-l` 可以在解压文件的情况下查看压缩文件内的内容。
+
+已经以 .gz 结尾的文件不能被压缩（哪怕并不是 gzip 压缩文件），不是以 .gz 结尾的文件不能被解压（哪怕实际是 gzip 压缩文件），但能用 `-l` 查看其内容。
+
+压缩和解压貌似都不能重命名。
+
+gzip 不能压缩目录。
+
+只能压缩单文件，哪怕指定了多个文件名，也是分别压缩的。
+
+### `tar`
+
+`tar` 是一个打包命令，可以把多个文件或目录打包成一个文件。打包的同时，也可以压缩。
+
+`-c` 创建（create）包，`-f` 指定生成的文件名，必须要有
+
+```text
+julian@ubuntu2204:~/temp$ tree
+.
+├── elit
+├── ipsum
+│   └── lorem
+└── sanc
+    └── manga
+
+2 directories, 3 files
+
+julian@ubuntu2204:~/temp$ tar -cf my.tar ipsum/ sanc/ elit 
+
+julian@ubuntu2204:~/temp$ ls
+elit  ipsum  my.tar  sanc
+```
+
+`-t` 可以查看包的内容，`-v` 可以列举更详细的信息，`-f` 还是指定文件名
+
+```text
+julian@ubuntu2204:~/temp$ tar -tvf my.tar 
+drwxrwxr-x julian/julian     0 2023-11-25 23:30 ipsum/
+-rw-rw-r-- julian/julian  2457 2023-11-25 20:44 ipsum/lorem
+drwxrwxr-x julian/julian     0 2023-11-25 23:34 sanc/
+-rw-rw-r-- julian/julian  1712 2023-11-25 23:34 sanc/manga
+-rw-rw-r-- julian/julian  3347 2023-11-25 23:35 elit
+```
+
+`-x` 解包，`-f` 还是指定文件名
+
+```text
+julian@ubuntu2204:~/temp/abc$ ls
+my.tar
+
+julian@ubuntu2204:~/temp/abc$ tar -xf my.tar 
+
+julian@ubuntu2204:~/temp/abc$ tree
+.
+├── elit
+├── ipsum
+│   └── lorem
+├── my.tar
+└── sanc
+    └── manga
+
+2 directories, 4 files
+```
+
+解包时不能指定目标路径。
+
+解包时可以只指定部分内容解包（下例只解了包中的一个目录）
+
+```text
+julian@ubuntu2204:~/temp/abc$ ls
+my.tar
+
+julian@ubuntu2204:~/temp/abc$ tar -xf my.tar ipsum/
+
+julian@ubuntu2204:~/temp/abc$ ls
+ipsum  my.tar
+julian@ubuntu2204:~/temp/abc$ tree
+.
+├── ipsum
+│   └── lorem
+└── my.tar
+
+1 directory, 2 files
+```
+
+删除包中的内容（添加的话把 `--delete` 改为 `--append`）
+
+```text
+julian@ubuntu2204:~/temp/abc$ tar -f my.tar --delete elit
+
+julian@ubuntu2204:~/temp/abc$ tar -tvf my.tar 
+drwxrwxr-x julian/julian     0 2023-11-25 23:30 ipsum/
+-rw-rw-r-- julian/julian  2457 2023-11-25 20:44 ipsum/lorem
+drwxrwxr-x julian/julian     0 2023-11-25 23:34 sanc/
+-rw-rw-r-- julian/julian  1712 2023-11-25 23:34 sanc/manga
+```
+
+打包时使用 gzip 压缩
+
+```text
+julian@ubuntu2204:~/temp$ tar -cf my.tar.gz elit ipsum/ sanc/ --gzip
+
+julian@ubuntu2204:~/temp$ ls
+abc  elit  ipsum  my.tar.gz  sanc
+```
+
+当然使用 `tar -zcf` 也是可以的。
+
+`tar -xf` 貌似也可以识别出被压缩过的包，并自动解压缩。
+
+```text
+julian@ubuntu2204:~/temp/abc$ ls
+my.tar.gz
+
+julian@ubuntu2204:~/temp/abc$ tar -xf my.tar.gz 
+
+julian@ubuntu2204:~/temp/abc$ tree
+.
+├── elit
+├── ipsum
+│   └── lorem
+├── my.tar.gz
+└── sanc
+    └── manga
+
+2 directories, 4 files
+```
+
+选择其他压缩格式
+
+```text
+julian@ubuntu2204:~/temp/abc$ tar -cf my.tar.bz elit ipsum/ sanc/ --bzip2
+
+julian@ubuntu2204:~/temp/abc$ ls
+elit  ipsum  my.tar.bz  sanc
+
+julian@ubuntu2204:~/temp/abc$ file my.tar.bz 
+my.tar.bz: bzip2 compressed data, block size = 900k
+```
+
+```text
+julian@ubuntu2204:~/temp/abc$ tar -cf my.tar.xz elit ipsum/ sanc/ --xz
+
+julian@ubuntu2204:~/temp/abc$ ls
+elit  ipsum  my.tar.xz  sanc
+
+julian@ubuntu2204:~/temp/abc$ file my.tar.xz 
+my.tar.xz: XZ compressed data, checksum CRC64
+```
+
+### `zip`
+
+压缩文件（不会删除源文件）
+
+```text
+julian@ubuntu2204:~/temp/abc$ ls
+elit  ipsum  sanc
+
+julian@ubuntu2204:~/temp/abc$ zip elit.zip elit 
+  adding: elit (deflated 64%)
+
+julian@ubuntu2204:~/temp/abc$ ls
+elit  elit.zip  ipsum  sanc
+```
+
+加 `-r` 可以压缩目录
+
+```text
+julian@ubuntu2204:~/temp/abc$ ls -F
+elit  ipsum/  sanc/
+
+julian@ubuntu2204:~/temp/abc$ zip -r my.zip elit ipsum/ sanc/
+  adding: elit (deflated 64%)
+  adding: ipsum/ (stored 0%)
+  adding: ipsum/lorem (deflated 62%)
+  adding: sanc/ (stored 0%)
+  adding: sanc/manga (deflated 59%)
+
+julian@ubuntu2204:~/temp/abc$ ls
+elit  ipsum  my.zip  sanc
+```
+
+### `unzip`
+
+`-l` 可以列举 zip 压缩包的内容，加 `-v` 可以显示更详细的信息
+
+```text
+julian@ubuntu2204:~/temp/abc$ unzip -l my.zip 
+Archive:  my.zip
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+     3347  2023-11-25 23:35   elit
+        0  2023-11-25 23:30   ipsum/
+     2457  2023-11-25 20:44   ipsum/lorem
+        0  2023-11-25 23:34   sanc/
+     1712  2023-11-25 23:34   sanc/manga
+---------                     -------
+     7516                     5 files
+```
+
+`-d` 可以指定解压目录
+
+```text
+julian@ubuntu2204:~/temp/abc$ tree
+.
+├── def
+└── my.zip
+
+1 directory, 1 file
+
+julian@ubuntu2204:~/temp/abc$ unzip my.zip -d def/
+Archive:  my.zip
+  inflating: def/elit                
+   creating: def/ipsum/
+  inflating: def/ipsum/lorem         
+   creating: def/sanc/
+  inflating: def/sanc/manga          
+
+julian@ubuntu2204:~/temp/abc$ tree
+.
+├── def
+│   ├── elit
+│   ├── ipsum
+│   │   └── lorem
+│   └── sanc
+│       └── manga
+└── my.zip
+
+3 directories, 4 files
+```
+
+### `bzip2`
+
+bzip2 是 gzip 的升级版，文件后缀默认是 .bz2，更适合压缩大文件。
+
+其操作方式及特点跟 gzip 很相似，比如
+
+- 默认不保留源文件
+- 不能压缩目录
+- 只能压缩单文件
+- 已经以 .bz2 结尾的文件不能再压缩（哪怕实际不是 bzip2 压缩文件）
+
+但也有些地方不同，比如
+
+- 没有 `-l` 列举压缩文件内容。
+- 不以 .bz2 结尾但实际是 bzip2 压缩包的文件可以解压
+
+### 总结
+
+总结来说，`zip` 是 Windows 和 Linux 通用的，有些相似之处，可以同时处理目录和文件。但是 `gzip` 和 `bzip2` 都只是压缩命令，不能打包，而 `tar` 负责打包，同时还能压缩。因此用 `tar` 的情况更多一些。
 
 ## 4.7 网络命令
 
