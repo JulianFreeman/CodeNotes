@@ -648,6 +648,102 @@ fn ascii_capitalize(v: &mut Vec<char>) {
 
 ## 数据必须比它所有的引用都活得长
 
+作为 *指针安全原则* 的一部分，借用检查器确保 **数据比它所有的引用都活得长**。Rust 用两种方式确保此事。第一种处理在一个函数的作用域内创建和释放的引用。比如，我们尝试释放一个有引用的字符串：
 
+```rust
+let s = String::from("Hello world");
+let s_ref = &s;
+drop(s);
+println!("{}", s_ref);
+```
+
+> 上述代码不能编译
+
+要发现这样的错误，Rust 使用我们前面讨论的权限机制。`&s` 这个借用移除了 `s` 的 O 权限，然后 `drop` 需要有 O 权限，这就不匹配了。
+
+这里的关键点是，Rust 知道 `s_ref` 活了多长。但是如果 Rust 不知道，它就需要另一种机制来确保此事了。特别是当一个引用既不是函数的输入也不是函数的输出时。比如说，下面是一个返回一个向量第一个元素的安全函数：
+
+```rust
+fn first(strings: &Vec<String>) -> &String {
+    let s_ref = &strings[0];
+    s_ref
+}
+```
+
+这里有一种新的权限，F 权限。当一个表达式使用了一个输入的引用（比如 `&string[0]`）或者返回了一个引用（比如 `return s_ref`）时，F 权限必须存在。
+
+不同于 RWO 权限，F 在函数体内不会发生改变。如果一个引用被允许在一个特定的表达式中使用，那么它就有 F 权限。比如说，我们把 `first` 函数改为一个新函数 `first_or`，接收一个 `default` 参数：
+
+```rust
+fn first_or(strings: &Vec<String>, default: &String) -> &String {
+    if strings.len() > 0 {
+        &strings[0]
+    } else {
+        default
+    }
+}
+```
+
+> 上述代码不能编译
+
+这个函数不能编译，因为表达式 `&string[0]` 和 `default` 缺少用来返回的 F 权限。但是为什么？Rust 给出了如下错误：
+
+```text
+error[E0106]: missing lifetime specifier
+ --> test.rs:1:57
+  |
+1 | fn first_or(strings: &Vec<String>, default: &String) -> &String {
+  |                      ------------           -------     ^ expected named lifetime parameter
+  |
+  = help: this function's return type contains a borrowed value, but the signature does not say whether it is borrowed from `strings` or `default`
+```
+
+这里的“缺少生命周期指示符”可能有点让人困惑，不过下面的帮助信息倒很有用。如果 Rust 只看这个函数签名的话，它不知道返回的 `&String` 是 `strings` 的引用还是 `default` 的引用。要理解为什么这个很关键，我们这样：
+
+```rust
+fn main() {
+    let strings = vec![];
+    let default = String::from("default");
+    let s = first_or(&strings, &default);
+    drop(default);
+    println!("{}", s);
+}
+```
+
+如果程序允许 `default` 返回，那么它就不安全。就跟上例一样，`drop` 会让 `s` 指向无效内存。Rust 只有确定了 `default` *绝对* 不会被返回，才能允许这个程序编译。
+
+要指定 `default` 是否能被返回，Rust 提供了一种叫 *生命周期参数* 的机制。我们会在第 10 章介绍这个功能。现在的话，我们只需要知道：
+
+1. 输入和输出引用跟函数体内的引用不一样；
+2. Rust 使用 F 权限检查这些引用是否安全。
+
+我们再看一下另一种情境下的 F 权限，比如说你想返回一个栈中变量的引用：
+
+```rust
+fn return_a_string() -> &String {
+    let s = String::from("Hello world");
+    let s_ref = &s;
+    s_ref
+}
+```
+
+> 上述代码不能编译
+
+上述程序不安全，因为当函数返回后，`&s` 就无效了。Rust 会以与之前类似的错误拒绝编译程序。现在你知道了，这个错误指的是 `s_ref` 缺少 F 权限。
+
+## 总结
+
+引用提供了一种不转移数据所有权的同时还能读写数据的能力。引用通过借用创建（`&` 和 `&mut`），通过解引用（`*`）使用（通常是隐式的）。
+
+然后，引用也很容易被误用。Rust 的借用检查器通过一系列权限确保引用都被安全使用：
+
+- 所有变量都能读、拥有数据，有时能写数据。
+- 创建引用会把原左值的权限转移到引用上。
+- 引用的生命周期结束后权限会被返还。
+- 数据必须比它所有的引用都活得长。
+
+在这一节，你可能会感觉我们讨论了更多关于 Rust *不能* 做什么得内容。没错，就是这样。Rust 的一个核心特性就是允许你在没有垃圾回收机制的情况下使用指针，同时还能避免未定义行为。现在理解这些安全规则可以帮助你之后更好地理解编译器的报错。
+
+# 解决所有权错误
 
 
