@@ -1523,16 +1523,315 @@ cat: env.txt: Permission denied
 
 比如 `setfacl -x u:liz env.txt` 去除 `liz` 用户对 `env.txt` 的所有 ACL 权限。
 
-
-
-
+`getfacl` 可以查看文件或目录的 ACL 权限。
 
 ### 8.1.3 最大有效权限与删除 ACL 权限
 
+用 `getfacl` 查看文件的 ACL 权限，可以看到如下内容
+
+```text
+root@ubuntu2204:/tmp/root# getfacl env.txt 
+# file: env.txt
+# owner: root
+# group: root
+user::rw-
+group::---
+mask::---
+other::---
+```
+
+> 以下是视频说的内容
+
+这里的 `mask` 就是最大有效权限。即，用命令设置权限之后，还需要与 `mask` 相与才是最终的权限。
+
+比如 `mask::r-x`，那么即便我们设置 `-m u:liz:rwx`，用户最终得到的权限也只能是 `r-x`。
+
+可以通过形如 `setfacl -m m::r-x file` 的方式设置 `mask`
+
+```text
+root@ubuntu2204:/tmp/root# setfacl -m m::r-x env.txt 
+
+root@ubuntu2204:/tmp/root# getfacl env.txt 
+# file: env.txt
+# owner: root
+# group: root
+user::rw-
+group::---
+mask::r-x
+other::---
+```
+
+> 以下是实际测试结果
+
+先设置 `mask`，再设置某个用户的权限后，`mask` 会被覆盖。
+
+```text
+root@ubuntu2204:/tmp/root# setfacl -m m::r-x env.txt 
+
+root@ubuntu2204:/tmp/root# getfacl env.txt 
+# file: env.txt
+# owner: root
+# group: root
+user::rw-
+group::---
+mask::r-x
+other::---
+
+root@ubuntu2204:/tmp/root# setfacl -m u:liz:rwx env.txt 
+
+root@ubuntu2204:/tmp/root# getfacl env.txt 
+# file: env.txt
+# owner: root
+# group: root
+user::rw-
+user:liz:rwx
+group::---
+mask::rwx
+other::---
+```
+
+这里设置了用户的权限之后，`mask` 也变了。此时再设置一遍 `mask`
+
+```text
+root@ubuntu2204:/tmp/root# setfacl -m m::r-x env.txt 
+
+root@ubuntu2204:/tmp/root# getfacl env.txt 
+# file: env.txt
+# owner: root
+# group: root
+user::rw-
+user:liz:rwx			#effective:r-x
+group::---
+mask::r-x
+other::---
+```
+
+好像 `mask` 才生效。所以这里看 `mask` 好像是后作用的。此时再设置一个用户的
+
+```text
+root@ubuntu2204:/tmp/root# setfacl -m u:karl:rwx env.txt 
+
+root@ubuntu2204:/tmp/root# getfacl env.txt 
+# file: env.txt
+# owner: root
+# group: root
+user::rw-
+user:karl:rwx
+user:liz:rwx
+group::---
+mask::rwx
+other::---
+```
+
+`mask` 又变了。而且之前对 liz 的限制也不起作用了。
+
+所以测试来看，`mask` 并不是在设置新权限前必须与它相与，而是对已有的权限做一层遮罩，滤掉某些权限。
+
+```text
+root@ubuntu2204:/tmp/root# setfacl -m m::r-x env.txt 
+
+root@ubuntu2204:/tmp/root# getfacl env.txt 
+# file: env.txt
+# owner: root
+# group: root
+user::rw-
+user:karl:rwx			#effective:r-x
+user:liz:rwx			#effective:r-x
+group::---
+mask::r-x
+other::---
+```
+
+`-x` 删除特定用户或组的权限，`-b` 可以删除目录下所有文件的 ACL 权限。
+
+```text
+root@ubuntu2204:/tmp/root# ls -l env.txt 
+-rw-r-x---+ 1 root root 110 Nov 27 17:58 env.txt
+
+root@ubuntu2204:/tmp/root# setfacl -b env.txt 
+
+root@ubuntu2204:/tmp/root# getfacl env.txt 
+# file: env.txt
+# owner: root
+# group: root
+user::rw-
+group::---
+other::---
+
+root@ubuntu2204:/tmp/root# ls -l env.txt 
+-rw------- 1 root root 110 Nov 27 17:58 env.txt
+```
+
 ### 8.1.4 默认 ACL 权限和递归 ACL 权限
 
+`-R` 后加目录可以把 ACL 的设置递归应用到目录下的所有文件和目录。这个参数只能在后，对顺序有点要求
+
+```text
+root@ubuntu2204:/tmp/root# setfacl -m u:liz:rwx project/
+
+root@ubuntu2204:/tmp/root# getfacl project/abc.txt 
+# file: project/abc.txt
+# owner: root
+# group: root
+user::rw-
+group::---
+other::---
+
+root@ubuntu2204:/tmp/root# setfacl -m u:liz:rwx -R project/
+
+root@ubuntu2204:/tmp/root# getfacl project/abc.txt 
+# file: project/abc.txt
+# owner: root
+# group: root
+user::rw-
+user:liz:rwx
+group::---
+mask::rwx
+other::---
+```
+
+但是在运行命令后新添加的文件或者目录，不受这个限制。也就是说，这个 `-R` 的递归设置，只是一次性的快速设置，而不是一种规则，能时时保证目录下所有文件都遵守这个设置。
+
+要想让其成为一种规则，需要设置默认 ACL 权限。如果给一个目录设置了默认 ACL 权限，那么其下创建的新文件和目录都会应用这个权限。
+
+设置的方法就是在常规的权限规则设置之前加一个 `d:`，而且不用加 `-R`
+
+```text
+root@ubuntu2204:/tmp/root# setfacl -m d:u:liz:rwx project/
+
+root@ubuntu2204:/tmp/root# getfacl project/
+# file: project/
+# owner: root
+# group: root
+user::rwx
+user:liz:rwx
+group::---
+mask::rwx
+other::---
+default:user::rwx
+default:user:liz:rwx
+default:group::---
+default:mask::rwx
+default:other::---
+
+root@ubuntu2204:/tmp/root# touch project/ghi.txt
+
+root@ubuntu2204:/tmp/root# getfacl project/ghi.txt 
+# file: project/ghi.txt
+# owner: root
+# group: root
+user::rw-
+user:liz:rwx			#effective:rw-
+group::---
+mask::rw-
+other::---
+```
+
+> 注意，这里文件依然默认没有执行权限。
+
+这个命令作用于后来新添加的文件，所以如果有已存在的文件或目录，设置了父目录的默认权限，并不会让它们的权限发生改变。
 
 ## 8.2 文件特殊权限
+
+### 8.2.1 SetUID
+
+SUID：让执行者临时拥有被执行文件属主的权限（仅对 **二进制文件** 有效，且执行者必须要有对该文件的执行权限）
+
+比如所有用户都可以执行用于修改用户密码的 `passwd` 命令，但用户密码保存在 `/etc/shadow` 文件中，默认除了超级用户外的所有用户都没有查看或编辑该文件的权限，所以对 `passwd` 命令加上 SUID 权限位，可让普通用户临时获得程序所有者的身份，即以 root 用户的身份将变更的密码信息写入到 `shadow` 文件中。
+
+`ll /usr/bin/passwd` 查看该命令的权限，看到所有者的权限为 `rws`，即拥有 SUID 权限。如果此文件没有执行权限，则为 `rwS`，表示设置的 SUID 权限无效。因为 SUID 只针对有执行权限的文件有效。  
+
+SUID 权限 **非常危险**，不要轻易给任何命令加 SUID 权限。
+
+#### 设置 SUID
+
+`chmod u+s [file]` 或者形如 `chmod 4755 [file]`
+
+```text
+julian@ubuntu2204:/tmp/julian/cplus$ ls -l
+total 20
+-rwxr--r-- 1 julian julian 15960 Nov 24 13:31 hello
+-rw-rw-r-- 1 julian julian    78 Nov 24 13:30 hello.c
+
+julian@ubuntu2204:/tmp/julian/cplus$ chmod u+s hello
+
+julian@ubuntu2204:/tmp/julian/cplus$ ls -l
+total 20
+-rwsr--r-- 1 julian julian 15960 Nov 24 13:31 hello
+-rw-rw-r-- 1 julian julian    78 Nov 24 13:30 hello.c
+```
+
+但是这样其他用户依然无法执行 `hello` 文件。因为 SUID 要求首先用户要对这个文件有执行权限，才会考虑这个用户在执行文件时能不能变为所有者身份。此时对于 `hello` 来说，所属组和其他人都没有执行权限，因此也就不存在变不变身的说法了。
+
+要做这个实验，可能只能模拟 `passwd` 了。
+
+下例中 `modfile` 文件会向 `testfile.txt` 中添加一行文本，但后者除了所有者其他人都没有权限修改
+
+```text
+julian@ubuntu2204:/tmp/julian/prog$ ls -l
+total ..
+-rwxr-xr-x 1 julian julian 30520 Nov 27 20:41 modfile
+-rw-r--r-- 1 julian julian     0 Nov 27 20:40 testfile.txt
+
+julian@ubuntu2204:/tmp/julian/prog$ ./modfile 
+
+julian@ubuntu2204:/tmp/julian/prog$ cat testfile.txt 
+hello there!
+
+######################################################
+liz@ubuntu2204:/tmp/julian/prog$ ls -l
+total ..
+-rwxr-xr-x 1 julian julian 30520 Nov 27 20:41 modfile
+-rw-r--r-- 1 julian julian    13 Nov 27 20:42 testfile.txt
+
+liz@ubuntu2204:/tmp/julian/prog$ ./modfile 
+Fail to modify the file
+```
+
+此时添加 SUID 权限，其他人就可以修改文件了
+
+```text
+julian@ubuntu2204:/tmp/julian/prog$ chmod u+s modfile
+
+julian@ubuntu2204:/tmp/julian/prog$ ls -l
+total ..
+-rwsr-xr-x 1 julian julian 30520 Nov 27 20:41 modfile
+-rw-r--r-- 1 julian julian    13 Nov 27 20:42 testfile.txt
+
+######################################################
+liz@ubuntu2204:/tmp/julian/prog$ ls -l
+total ..
+-rwsr-xr-x 1 julian julian 30520 Nov 27 20:41 modfile
+-rw-r--r-- 1 julian julian    13 Nov 27 20:42 testfile.txt
+
+liz@ubuntu2204:/tmp/julian/prog$ ./modfile 
+
+liz@ubuntu2204:/tmp/julian/prog$ cat testfile.txt 
+hello there!
+hello there!
+```
+
+当没有加 SUID 时，其他人对 `modfile` 有执行权限，但是对 `testfile.txt` 没有写权限，因此执行时会报错，无法正确写入文本。当加入 SUID 之后，执行 `modfile` 时暂时变为所有者身份，因此就对 `testfile` 有写权限了。
+
+如果其他人一开始压根对 `modfile` 没有执行权限，那么就没后面的 SUID 什么事了
+
+```text
+liz@ubuntu2204:/tmp/julian/prog$ ls -l
+total ..
+-rwsr-xr-- 1 julian julian 30520 Nov 27 20:41 modfile
+-rw-r--r-- 1 julian julian    26 Nov 27 20:44 testfile.txt
+
+liz@ubuntu2204:/tmp/julian/prog$ ./modfile
+-bash: ./modfile: Permission denied
+```
+
+#### 取消 SUID
+
+`chmod u-s [file]` 或者形如 `chmod 755 [file]`。
+
+### 8.2.2 SetGID
+
+### 8.2.3 Sticky BIT
 
 ## 8.3 文件系统属性 `chattr` 权限
 
