@@ -1735,7 +1735,7 @@ other::---
 
 ### 8.2.1 SetUID
 
-SUID：让执行者临时拥有被执行文件属主的权限（仅对 **二进制文件** 有效，且执行者必须要有对该文件的执行权限）
+SUID：让执行者临时拥有被执行文件 **属主** 的权限（仅对 **二进制文件** 有效，且执行者必须要有对该文件的执行权限）
 
 比如所有用户都可以执行用于修改用户密码的 `passwd` 命令，但用户密码保存在 `/etc/shadow` 文件中，默认除了超级用户外的所有用户都没有查看或编辑该文件的权限，所以对 `passwd` 命令加上 SUID 权限位，可让普通用户临时获得程序所有者的身份，即以 root 用户的身份将变更的密码信息写入到 `shadow` 文件中。
 
@@ -1831,10 +1831,253 @@ liz@ubuntu2204:/tmp/julian/prog$ ./modfile
 
 ### 8.2.2 SetGID
 
+**SGID 功能一**：让执行者临时拥有被执行文件 **属组** 的权限（针对二进制文件，且执行者对该文件有执行权限）
+
+举例来说，常用的查找命令 `locate`，其实体为 `/usr/bin/plocate`，该命令所读取的数据库是 `/var/lib/plocate/plocate.db`，但该数据库的属主是 `root`，属组是 `plocate`，权限为 `rw-r-----`。通常没有普通用户属于这个属组，也就是说，普通用户没有读取这个数据库的权限，但是用户又需要用 `locate` 查找文件，所以就给 `locate` 命令（实际是 `/usr/bin/plocate`）加了 SGID 权限位。`locate` 的属组是 `plocate`，这样，当用户执行 `locate` 命令时，用户就临时属于 `plocate` 这个属组了，也就可以读取 `plocate.db` 这个数据库了。
+
+
+`ll /usr/bin/plocate` 查看该命令权限。看到所属组的权限为 `r-s`，表示拥有 SGID 权限。该权限 **同样危险**，也不要轻易给命令加 SGID 权限。
+
+**SGID 功能二**：在该目录创建的文件自动继承此目录的属组（只对目录设置）
+
+通常创建的文件的属组是创建者的基本组，但如果该目录被设置了 SGID 权限，那么该目录下的所有文件都会属于该目录的属组。
+
+> 这个功能很方便管理目录和文件，可以用。
+
+#### 设置 SGID
+
+`chmod g+s [file]` 或者形如 `chmod 2755 [file]`
+
+**针对目录**：
+
+```text
+julian@ubuntu2204:/tmp/julian$ mkdir proj
+
+julian@ubuntu2204:/tmp/julian$ chmod g+s,o+w proj/
+
+julian@ubuntu2204:/tmp/julian$ ls -dl proj/
+drwxrwsrwx 2 julian julian 4096 Nov 28 12:30 proj/
+
+#################################################
+liz@ubuntu2204:/tmp/julian$ ls -dl proj/
+drwxrwsrwx 2 julian julian 4096 Nov 28 12:30 proj/
+
+liz@ubuntu2204:/tmp/julian$ touch proj/liz.txt
+
+liz@ubuntu2204:/tmp/julian$ ls -l proj/liz.txt 
+-rw-rw-r-- 1 liz julian 0 Nov 28 12:31 proj/liz.txt
+```
+
+这种情况下，liz 对 `proj` 只有其他人的权限，因此首先其他人要对该目录有写权限，才能创建文件，其次如果该目录设置了 SGID，那么创建的文件属组是 julian 而不是 liz。
+
+这样可以保证 julian 对 liz 创建的文件内容有一定操作权限（使用属组的权限），否则 julian 可能无法编辑其内容（其他人没有写权限）。
+
+另一种情况是，用户是目录属组的一员，目录数组首先要对目录有写权限，如果目录设置了 SGID，该用户在目录下创建的文件依然是目录属组
+
+```text
+julian@ubuntu2204:/tmp/julian$ cat /etc/group | grep friends
+friends:x:1004:julian,liz
+
+julian@ubuntu2204:/tmp/julian$ ls -dl proj/
+drwxrwsr-x 2 root friends 4096 Nov 28 13:06 proj/
+
+julian@ubuntu2204:/tmp/julian$ touch proj/ju.txt
+
+julian@ubuntu2204:/tmp/julian$ ls -l proj/ju.txt 
+-rw-rw-r-- 1 julian friends 0 Nov 28 13:07 proj/ju.txt
+```
+
+这样属组的其他人也可以编辑这个文件
+
+```text
+liz@ubuntu2204:/tmp/julian$ ls -l proj/ju.txt 
+-rw-rw-r-- 1 julian friends 0 Nov 28 13:16 proj/ju.txt
+
+liz@ubuntu2204:/tmp/julian$ echo "hello julian" >> proj/ju.txt 
+
+liz@ubuntu2204:/tmp/julian$ cat proj/ju.txt 
+hello julian
+```
+
+所以这里给目录设置 SGID 是允许目录的属组对目录的里的文件也能执行属组权限，否则的话就只能执行其他人权限了。
+
+> 添加新的用户组后可能需要注销重新登录才能使用该组的权限。
+
+**针对文件**：
+
+跟 SUID 差不多，就不做测试了。
+
+#### 取消 SGID
+
+`chmod g-s [file]` 或者形如 `chmod 755 [file]`。
+
 ### 8.2.3 Sticky BIT
 
-## 8.3 文件系统属性 `chattr` 权限
+SBIT：只可管理自己的文件而不能删除他人的文件（仅对目录有效）
 
-## 8.4 系统命令 `sudo` 权限
+`/tmp` 的权限是 `777`，任何用户在该目录下都有全权限，但如果一个用户创建的文件被另一个用户删了怎么办？这就太混乱了，所以查看 `/tmp` 的权限时我们实际看到它的其他人权限是 `rwt`，指该目录拥有 SBIT 权限位，用户在该目录下只能删除自己创建的文件，而不能删除其他人创建的文件。
+
+> 该权限也可以用。
+
+#### 设置 SBIT
+
+`chmod o+t [dir]` 或者形如 `chmod 1777 [dir]`
+
+上面说的一个用户不能删除另一个用户创建的文件，除了排除 root 用户外，**目录的所有者也不受此限制**。
+
+比如 julian 创建一个目录，并赋予 SBIT 权限
+
+```text
+julian@ubuntu2204:/tmp/julian$ mkdir juhouse
+
+julian@ubuntu2204:/tmp/julian$ chmod 1777 juhouse/
+
+julian@ubuntu2204:/tmp/julian$ ls -dl juhouse/
+drwxrwxrwt 2 julian julian 4096 Nov 28 13:50 juhouse/
+```
+
+但是把所属组改为 liz
+
+```text
+root@ubuntu2204:/tmp/julian# chgrp liz juhouse/
+
+root@ubuntu2204:/tmp/julian# ls -dl juhouse/
+drwxrwxrwt 2 julian liz 4096 Nov 28 13:50 juhouse/
+```
+
+这时 karl 来创建文件
+
+```text
+karl@ubuntu2204:/tmp/julian/juhouse$ touch karl1 karl2
+
+karl@ubuntu2204:/tmp/julian/juhouse$ ls -l
+total 0
+-rw-rw-r-- 1 karl karl 0 Nov 28 13:52 karl1
+-rw-rw-r-- 1 karl karl 0 Nov 28 13:52 karl2
+```
+
+liz 不能删除，但 julian 还是能删的。
+
+```text
+liz@ubuntu2204:/tmp/julian$ rm juhouse/karl1
+rm: remove write-protected regular empty file 'juhouse/karl1'? y
+rm: cannot remove 'juhouse/karl1': Operation not permitted
+
+#############################################################
+julian@ubuntu2204:/tmp/julian$ rm juhouse/karl2
+rm: remove write-protected regular empty file 'juhouse/karl2'? y
+
+julian@ubuntu2204:/tmp/julian$ ls -l juhouse/
+total 0
+-rw-rw-r-- 1 karl karl 0 Nov 28 13:52 karl1
+```
+
+#### 取消 SGID
+
+`chmod o-t [dir]` 或者形如 `chmod 777 [dir]`。
+
+## 8.3 文件系统属性权限
+
+### `chattr`
+
+`chattr` 用于设置文件的隐藏权限。例如 `chattr +i file` 增加 `i` 权限，`chattr -i file` 取消 `i` 权限。
+
+> 需要管理员权限。
+
+| 参数  | 描述                   | 作用                                    |
+| --- | -------------------- | ------------------------------------- |
+| `i` | Immutable            | 对文件无法删除或重命名文件，无法修改文件内容；<br />对目录，不能创建或删除或重命名文件，但可以修改文件内容 |
+| `a` | Append_Only          | 仅允许追加内容，无法覆盖或删除已有内容                   |
+| `S` | Synchronous_Updates  | 文件内容变更后立即同步到硬盘                        |
+| `s` | Secure_Deletion      | 删除时用 `0` 填充原文件所在硬盘区域，不可恢复             |
+| `A` | No_Atime             | 不再修改该文件的最后访问时间                        |
+| `d` | No_Dump              | 使用 `dump` 备份时忽略该文件/目录                 |
+| `c` | Compresson_Requested | 存储时默认将文件/目录进行压缩，读取时会自动解压缩             |
+| `u` | Undelete             | 删除此文件后保留其在硬盘的数据，方便日后恢复                |
+
+#### `i`
+
+对文件：
+
+```text
+root@ubuntu2204:/tmp/root# chattr +i abc
+
+root@ubuntu2204:/tmp/root# cat abc
+hello world
+
+root@ubuntu2204:/tmp/root# echo "how are you" >> abc
+bash: abc: Operation not permitted
+
+root@ubuntu2204:/tmp/root# mv abc def
+mv: cannot move 'abc' to 'def': Operation not permitted
+
+root@ubuntu2204:/tmp/root# rm -f abc
+rm: cannot remove 'abc': Operation not permitted
+```
+
+对目录：
+
+```text
+root@ubuntu2204:/tmp/root# tree
+.
+├── abc
+└── def
+    └── ghi
+
+1 directory, 2 files
+
+root@ubuntu2204:/tmp/root# chattr +i def/
+
+root@ubuntu2204:/tmp/root# touch def/jkl
+touch: setting times of 'def/jkl': No such file or directory
+
+root@ubuntu2204:/tmp/root# rm -f def/ghi
+rm: cannot remove 'def/ghi': Operation not permitted
+
+root@ubuntu2204:/tmp/root# mv def/ghi def/jkl
+mv: cannot move 'def/ghi' to 'def/jkl': Operation not permitted
+
+root@ubuntu2204:/tmp/root# echo "how are you" >> def/ghi 
+root@ubuntu2204:/tmp/root# cat def/ghi 
+hello world
+how are you
+```
+
+对目录加 `i` 权限，不影响修改目录里文件的内容，其实目录也可以看作是一个名单文件，保存里目录下的文件名称。那么父目录有 `i` 权限，不影响在子目录里创建文件，因为这种创建相当于修改目录（名单文件）的内容，是可以的。
+
+```text
+root@ubuntu2204:/tmp/root# chattr +i def/
+
+root@ubuntu2204:/tmp/root# cd def/
+
+root@ubuntu2204:/tmp/root/def# mkdir pqs
+mkdir: cannot create directory ‘pqs’: Operation not permitted
+
+root@ubuntu2204:/tmp/root/def# mkdir jkl/pqs
+
+root@ubuntu2204:/tmp/root/def# tree
+.
+├── ghi
+└── jkl
+    ├── mno
+    └── pqs
+
+2 directories, 2 files
+
+root@ubuntu2204:/tmp/root/def# mv jkl/ lkj
+mv: cannot move 'jkl/' to 'lkj': Operation not permitted
+
+root@ubuntu2204:/tmp/root/def# rm -rf jkl/
+rm: cannot remove 'jkl/': Operation not permitted
+
+root@ubuntu2204:/tmp/root/def# echo "hello" >> jkl/mno
+
+root@ubuntu2204:/tmp/root/def# cat jkl/mno 
+hello
+```
+
+
+
+## 8.4 系统命令权限
 
 
