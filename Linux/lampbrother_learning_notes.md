@@ -1972,7 +1972,7 @@ total 0
 -rw-rw-r-- 1 karl karl 0 Nov 28 13:52 karl1
 ```
 
-#### 取消 SGID
+#### 取消 SBIT
 
 `chmod o-t [dir]` 或者形如 `chmod 777 [dir]`。
 
@@ -1984,18 +1984,18 @@ total 0
 
 > 需要管理员权限。
 
-| 参数  | 描述                   | 作用                                    |
+| 参数  | 描述 | 作用 |
 | --- | -------------------- | ------------------------------------- |
-| `i` | Immutable            | 对文件无法删除或重命名文件，无法修改文件内容；<br />对目录，不能创建或删除或重命名文件，但可以修改文件内容 |
-| `a` | Append_Only          | 仅允许追加内容，无法覆盖或删除已有内容                   |
-| `S` | Synchronous_Updates  | 文件内容变更后立即同步到硬盘                        |
-| `s` | Secure_Deletion      | 删除时用 `0` 填充原文件所在硬盘区域，不可恢复             |
-| `A` | No_Atime             | 不再修改该文件的最后访问时间                        |
-| `d` | No_Dump              | 使用 `dump` 备份时忽略该文件/目录                 |
-| `c` | Compresson_Requested | 存储时默认将文件/目录进行压缩，读取时会自动解压缩             |
-| `u` | Undelete             | 删除此文件后保留其在硬盘的数据，方便日后恢复                |
+| `i` | Immutable            | 对文件，无法删除或重命名文件，无法修改文件内容；<br />对目录，不能创建或删除或重命名文件，但可以修改文件内容 |
+| `a` | Append_Only          | 对文件，仅允许追加内容，不能覆盖或删除已有内容；<br />对目录，可以创建新文件，但不能重命名或删除已有文件，对文件内容不影响 |
+| `S` | Synchronous_Updates  | 文件内容变更后立即同步到硬盘 |
+| `s` | Secure_Deletion      | 删除时用 `0` 填充原文件所在硬盘区域，不可恢复 |
+| `A` | No_Atime             | 不再修改该文件的最后访问时间 |
+| `d` | No_Dump              | 使用 `dump` 备份时忽略该文件/目录 |
+| `c` | Compresson_Requested | 存储时默认将文件/目录进行压缩，读取时会自动解压缩 |
+| `u` | Undelete             | 删除此文件后保留其在硬盘的数据，方便日后恢复 |
 
-#### `i`
+#### `i` 权限
 
 对文件：
 
@@ -2076,8 +2076,132 @@ root@ubuntu2204:/tmp/root/def# cat jkl/mno
 hello
 ```
 
+#### `a` 权限
 
+对文件：
+
+使用像 vim 这样的编辑器无法对有 `a` 权限的文件进行任何修改，可能是它无法判定你是否覆盖了已有内容吧，用 `>>` 这种方式可以追加。
+
+对目录：
+
+当使用 vim 这样的编辑器打开文件时，它会自动创建一些交换文件，有些用完可能就删除了，但是如果这个目录有 `a` 权限，虽然可以正常创建交换文件，但是用完了却删除不了，因为 `a` 只允许目录创建新文件，禁止删除已有文件，因此 vim 检测到交换文件还保留着，会认为有其他用户正在编辑这个文件，就会报出警告。
 
 ## 8.4 系统命令权限
+
+为什么安装系统时设置的第一个用户，不是 root 但是运行命令前加上 `sudo` 就可以有 root 的权限了呢？
+
+通过查看 `id` 之后发现，该用户属于一个叫 `sudo` 的用户组。而且只要把其他用户加入这个组，那这个用户也可以用 `sudo` 获得 root 权限。
+
+为什么加入这个组就可以使用 `sudo` 了呢？Linux 有一个文件来维护什么用户应该有什么权限，这个文件是 `/etc/sudoers`，用 `visudo` 可以修改这个文件，或者设置新的文件来添加规则。
+
+查看 `/etc/sudoers` 文件会发现如下几行
+
+```text
+root	ALL=(ALL:ALL) ALL
+
+%admin ALL=(ALL) ALL
+
+%sudo	ALL=(ALL:ALL) ALL
+
+@includedir /etc/sudoers.d
+```
+
+`%sudo` 这一行即表示对这个组的所有用户拥有以 root 身份执行所有命令的权限。
+
+最后一行表示新的规则也可以添加到 `/etc/sudoers.d` 这个目录下，因此使用 `visudo /etc/sudoers.d/sudoer_liz` 命令开启一个新的文件，然后写入 `liz ALL=/usr/bin/cat`，这表示 liz 这个用户可以在任何 IP 下以 root 身份执行 `/usr/bin/cat` 这个文件。如果要修改为特定 IP，要注意这里的 IP 指的是 Linux 本机的 IP，不是远程连接到 Linux 的 IP。
+
+此时用 `sudo -l` 查看一下 liz 用户有哪些权限可用，会看到如下内容
+
+```text
+liz@ubuntu2204:/tmp/root$ sudo -l
+[sudo] password for liz: 
+Matching Defaults entries for liz on ubuntu2204:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin, use_pty
+
+User liz may run the following commands on ubuntu2204:
+    (root) /usr/bin/cat
+```
+
+最后就是刚添加的内容。这表示当 liz 用户使用 `sudo cat [file]` 的时候，可以查看本来只有 root 才能查看的文件。但是此时 liz 只有在执行 `sudo cat` 的时候才能有 root 权限，执行其他命令还是普通的用户。
+
+要移除这个权限，把 `/etc/sudoers.d/sudoer_liz` 这个文件删掉就好了（因为里面只有这一行内容），删掉后再调用 `sudo -l`，就只有
+
+```text
+liz@ubuntu2204:/tmp/root$ sudo cat abc
+liz is not in the sudoers file.  This incident will be reported.
+```
+
+此时 root 会受到一封 mail，说明此事。
+
+# 第九讲 文件系统管理
+
+## 9.2 文件系统常用命令
+
+### 9.2.1 各种分区命令
+
+#### `df`
+
+前面说过了，可以查看分区状态，包括占用率、挂载点等，`-h` 可以以更易读的方式显示分区大小。
+
+#### `du`
+
+可以查看文件和目录的占用磁盘空间的大小。但是因为看文件用 `ls` 也能看，因此 `du` 主要用来看目录的。
+
+常用的 `-s` 只查看目录的总大小，`-h` 让大小显示更易读。
+
+```text
+root@ubuntu2204:/tmp/root# du -sh /etc
+12M	/etc
+```
+
+> `du` 会扫描目录下的所有文件计算大小，因此如果目录比较大，将会是一个高负载的操作。
+
+#### `df` 和 `du` 的区别
+
+`df` 统计占用率时是按从系统角度考虑的，除了文件本身占用的空间外，程序运行所占用的空间它也统计在内了，因此这个占有率是比较真实耳朵。
+
+`du` 统计时只考虑文件本身的大小，不考虑程序运行时的占用，因此如果计算整个根分区的大小，其结果可能会比 `df` 显示的占用大小略小。
+
+#### `fsck`
+
+`fsck [选项] [分区设备文件名]` 可以自动修复文件系统，知道就行，一般用不着。
+
+#### `dumpe2fs`
+
+形如 `dumpe2fs /dev/sda1` 可以查看分区的详细信息。太详细了，太多了，建议导出为文件再看。不说了。
+
+### 9.2.2 挂载命令
+
+`mount` 直接执行可以查看当前都有哪些挂载点。
+
+形如 `mount /dev/sda4 /home` 可以把一个设备挂载到一个目录下。
+
+`-o` 指定特殊选项，比如 `remount`，`exec`，`noexec` 等。
+
+`mount -o remount,noexec /home` 表示重新挂载 `/home` 并且禁止该分区的执行功能。也就是说，该分区的任何执行文件都不能被执行，哪怕 root 也不行，因为整个分区都禁用了执行功能。
+
+有时有的服务器允许用户上传文件，为了避免用户上传一些病毒脚本，可以把上传的文件都单独放在一个分区，然后禁用这个分区的执行功能。
+
+### 9.2.3 挂载光盘与 U 盘
+
+可以把 Ubuntu 的镜像文件当作光盘加入到虚拟机中，然后 `mount /dev/sr0 /cdrom` 就可以挂载了。
+
+`umount /dev/sr0` 或者 `umount /cdrom` 就可以卸载了。注意卸载时当前路径不能在挂载路径内。
+
+`cat /proc/partitions` 可以查看当前有哪些设备。比如查看插入的 U 盘是否识别。
+
+`fdisk -l /dev/sda` 可以查看某个设备的具体分区信息。
+
+`/proc/filesystems` 文件和 `/lib/modules/$(uname -r)/kernel/fs` 目录下记录了完整的文件系统列表，应该是指可支持的。
+
+> `man mount` 并搜索 `type` 查看说明。
+
+## 9.3 `fdisk` 分区
+
+## 9.4 `/etc/fstab` 文件修复
+
+## 9.5 分配 swap 分区
+
 
 
