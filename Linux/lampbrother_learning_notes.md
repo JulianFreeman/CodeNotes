@@ -214,7 +214,9 @@ julian@ubuntu2204:~/Documents$ tree
 
 `cat` 就是打印 **所有** 文件内容，没法分页，也没法打印局部。其 `-n` 参数指的是打印时 **添加行号**。
 
-直接用 `batcat`（`sudo apt install bat`）代替了。
+`-A` 可以显示非打印字符，比如行尾换行符 `\n` 显示为 `$`，Windows 文件的行尾换行会显示为 `^M$`，有时候会导致一些错误。`dos2unix` 命令可以把 Windows 换行符转换为 Linux 换行符。这个包可能需要手动安装。
+
+`batcat`（`sudo apt install bat`）可以根据不同的文件或编程语言高亮文件内容，同时也支持 `-A` 查看非打印字符。`batcat --help` 查看更多选项。
 
 #### 命令行查看文档的一些操作
 
@@ -2291,11 +2293,190 @@ UUID=.. swap swap defaults 0 0
 
 ## 10.1 Shell 概述
 
-## 10.2 Shell 脚本的执行方式
+Bourne Shell 从 1979 年起就在 Unix 中使用，其在 Linux 系统中被识别为 sh。
+
+C Shell 主要在 BSD 版的 Unix 系统中使用，语法与 C 语言类似。
+
+以上两种 Shell 的语法结构完全不同，互不兼容。
+
+Bourne Shell 家族主要有 sh，ksh，bash，psh，zsh；C Shell 家族主要有 csh，tcsh。
+
+`/etc/shells` 文件中记录着系统支持的 Shell 类型。运行命令就可以切换不同的 Shell。
 
 ## 10.3 Bash 的基本功能
 
+### 10.3.1 历史命令与命令补全
+
+`history` 命令可以查看最近的 1000 条终端命令。`~/.bash_history` 文件里记录着最近的 2000 条终端命令。
+
+这个数量的定义在 `~/.bashrc` 文件中
+
+```text
+HISTSIZE=1000
+HISTFILESIZE=2000
+```
+
+`~/.bash_history` 文件中默认只记录到上次关机时的终端命令，当前开机后的命令记录在内存中，使用 `history` 可以看到，但是还没记录到文件。
+
+`history -w` 可以把内存里的历史命令记录到文件中。
+
+`-c` 可以清空内存里的历史命令记录。
+
+`!n` 可以执行历史命令里的第 n 条命令。n 可以是多少可以用 `history` 查看，每条历史命令都有个序号。
+
+### 10.3.2 命令别名与常用快捷键
+
+`alias` 命令可以查看当前定义了多少别名。
+
+形如 `alias vi="vim"` 可以定义别名。双引号内的是原命令。
+
+命令执行顺序：
+
+1. 使用绝对路径或相对路径执行的命令
+2. 别名
+3. bash 内部命令
+4. `$PATH` 环境变量中定义的目录中找到的第一个命令
+
+通过 `alias` 查看可以知道，`ls` 之所以会显示不同的颜色，是因为有一个别名 `alias ls="ls --color=auto"`，也就是说，直接执行 `/bin/ls` 是不会有不同颜色的。
+
+别名的顺位比内部命令还高，也就是说如果定义一个 `alias cd=".."` 那么会优先执行这个 `cd` 别名，而不是直接执行内部命令。
+
+要取消某个别名，可以用 `unalias`。
+
+常用快捷键：
+
+| 快捷键 | 作用 |
+|--|--|
+| CTRL+A | 光标移动到命令开头 |
+| CTRL+E | 光标移动到命令结尾 |
+| CTRL+C | 终止当前命令 |
+| CTRL+L | 清屏，相当于 `clear` |
+| CTRL+U | 删除/剪切光标左边的所有字符 |
+| CTRL+K | 删除/剪切光标右边的所有字符 |
+| CTRL+Y | 粘贴剪切的内容 |
+| CTRL+R | 在历史命令中搜索 |
+| CTRL+D | 退出终端 |
+| CTRL+Z | 暂停并放入后台 |
+| CTRL+S | 暂停屏幕输出 |
+| CTRL+Q | 恢复屏幕输出 |
+
+### 10.3.3 输入输出重定向
+
+标准输出重定向：`>` 或 `>>`，此处输出的是正确运行的结果。
+
+标准错误输出重定向：`2>` 或 `2>>`，此处输出的是错误运行的结果。
+
+但是实际生产中，我们也不可能提前知道哪些命令是正确的，哪些是错误的，因此两种输出重定向分开写的情况不多。多数是合在一起写。写法有如下几种
+
+正确输出和错误输出同时保存：
+
+| 格式 | 说明 |
+|--|--|
+| `cmd > file 2>&1` | 覆盖 |
+| `cmd >> file 2>&1` | 追加 |
+| `cmd &> file` | 覆盖 |
+| `cmd &>> file` | 追加 |
+| `cmd >> file1 2>> file2` | 正确输出追加到 `file1`，<br />错误输出追加到 `file2` |
+
+输入重定向即把原本从标准输入，也就是键盘获取的内容转而从文件获取。
+
+`wc` 可以统计输入内容的行数、单词数和字符数。
+
+`wc < [file]` 可以统计文件内容的行数、单词数和字符数。
+
+### 10.3.4 多命令顺序执行与管道符
+
+`cmd1 ; cmd2` 两条命令之间没有任何关系，只是用分号写在一行而已。
+
+`cmd1 && cmd2` 第一条命令正确执行，才会执行第二条命令。
+
+`cmd1 || cmd2` 第一条命令错误执行，才会执行第二条命令。
+
+小技巧：`cmd && echo yes || echo no` 可以根据输出判断命令是否正确执行。
+
+### 10.3.5 通配符与其他特殊符号
+
+通配符跟正则还有点区别，通配符中的 `*` 匹配 0 个或多个，`?` 则必须匹配 1 个，0 个不行。
+
+特殊符号：
+
+| 符号 | 作用 |
+|--|--|
+| `''` | 单引号中的所有特殊符号都没有特殊含义 |
+| `""` | 双引号中，除了 `$`、`` ` ``、`\` 之外的所有特殊符号都没有特殊含义 |
+| ``` `` ``` | 反引号中的内容会当作命令对待（不推荐） |
+| `$()` | 括号内的内容会当作命令对待（推荐） |
+| `#` | 注释 |
+| `$` | 在变量前加该符号，表示调用变量的值 |
+| `\` | 转义符 |
+
+```text
+julian@ubuntu2204:~/temp/abc$ cmd=ls
+
+julian@ubuntu2204:~/temp/abc$ echo $cmd
+ls
+
+julian@ubuntu2204:~/temp/abc$ echo '$cmd'
+$cmd
+
+julian@ubuntu2204:~/temp/abc$ echo "$cmd"
+ls
+
+julian@ubuntu2204:~/temp/abc$ echo `$cmd`
+0abc 123 abc abcd
+
+julian@ubuntu2204:~/temp/abc$ echo $($cmd)
+0abc 123 abc abcd
+```
+
 ## 10.4 Bash 的变量
+
+### 10.4.1 用户自定义变量
+
+bash 的变量值默认都是字符串类型。如果要进行数值运算，需要明确指定。
+
+变量的等号两侧 **不能** 有空格。
+
+引用变量时可以使用 `$var` 或 `${var}` 的形式
+
+```text
+julian@ubuntu2204:~/temp/abc$ g=hello
+
+julian@ubuntu2204:~/temp/abc$ n="$g world"
+
+julian@ubuntu2204:~/temp/abc$ echo $n
+hello world
+
+julian@ubuntu2204:~/temp/abc$ m="${g}world"
+
+julian@ubuntu2204:~/temp/abc$ echo $m
+helloworld
+
+julian@ubuntu2204:~/temp/abc$ p="$m:yes"
+
+julian@ubuntu2204:~/temp/abc$ echo $p
+helloworld:yes
+```
+
+`set` 命令查看所有变量（会很长）。
+
+`unset [variable]` 可以删除变量
+
+```text
+julian@ubuntu2204:~/temp/abc$ echo $name
+ls
+
+julian@ubuntu2204:~/temp/abc$ unset name
+
+julian@ubuntu2204:~/temp/abc$ echo $name
+
+```
+
+### 10.4.2 环境变量
+
+### 10.4.3 位置参数变量
+
+### 10.4.4 预定义变量
 
 ## 10.5 Bash 的运算符
 
