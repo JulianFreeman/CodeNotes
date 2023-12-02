@@ -2474,11 +2474,255 @@ julian@ubuntu2204:~/temp/abc$ echo $name
 
 ### 10.4.2 环境变量
 
+本地变量只能在当前的 Shell 中生效，环境变量可以在当前 Shell 以及所有子 Shell 中生效。
+
+`pstree` 可以查看当前在哪一层 Shell。
+
+如果是用远程终端连接的，可能在 sshd 那一支，如果使用的是本机终端，可能在 login 那一支。总之最后都是 bash-pstree，应该是表示该 Shell 最后执行的一条命令。
+
+定义环境变量的方法：`export var=value`
+
+```text
+julian@ubuntu2204:~/temp/abc$ name=john
+
+julian@ubuntu2204:~/temp/abc$ export age=18
+
+julian@ubuntu2204:~/temp/abc$ sex=male
+
+julian@ubuntu2204:~/temp/abc$ export sex
+
+julian@ubuntu2204:~/temp/abc$ echo $name $age $sex
+john 18 male
+
+julian@ubuntu2204:~/temp/abc$ bash
+
+julian@ubuntu2204:~/temp/abc$ echo $name $age $sex
+18 male
+```
+
+`env` 可以查看当前 Shell 的环境变量。（`set` 则同时能看到本地变量和环境变量，范围比 `env` 大）
+
+有两个比较重要的环境变量：`$PATH` 和 `$PS1`。（后者在 `env` 看不到，但也属于环境变量，用 `set` 可看）
+
+`$PS1` 定义了终端的提示头的显示格式
+
+| 符号 | 说明 |
+|--|--|
+| `\d` | 显示日期：“星期 月 日” |
+| `\h` | 显示主机名 |
+| `\t` | 显示 24 小时制时间：“HH:MM:SS” |
+| `\T` | 显示 12 小时制时间：“HH:MM:SS” |
+| `\A` | 显示 24 小时制时间：“HH:MM” |
+| `\u` | 显示用户名 |
+| `\w` | 显示当前所在目录的完整路径 |
+| `\W` | 显示当前所在目录的最后一个目录 |
+| `\#` | 显示当前执行的是第几条命令 |
+| `\$` | 提示符。root 用户为 `#`，普通用户为 `$` |
+
 ### 10.4.3 位置参数变量
+
+| 变量 | 作用 |
+|--|--|
+| `$n` | `n` 为数字，`$0` 表示命令本身，`$1` 到 `$9` 表示第 1 到 9 个参数，10 以上的参数需要用 `${10}`
+| `$*` | 表示命令中的所有参数，即把所有参数看作一个整体 |
+| `$@` | 表示命令中的所有参数，但把每个参数区分对待 |
+| `$#` | 表示命令中所有参数的个数 |
+
+`param1.sh`：
+
+```sh
+#!/usr/bin/bash
+
+echo "0=$0, 1=$1, 2=$2"
+echo "Total: $#"
+echo "params: $*"
+echo "params: $@"
+```
+
+```text
+julian@ubuntu2204:~/temp/abc$ ./param1.sh 11 22
+0=./param1.sh, 1=11, 2=22
+Total: 2
+params: 11 22
+params: 11 22
+```
+
+`$*` 和 `$@` 的区别可以在 `for` 循环中看出来，前者只循环一次，后者会循环“参数总个数”次。
 
 ### 10.4.4 预定义变量
 
+| 变量 | 作用 |
+|--|--|
+| `$?` | 上一个命令的返回状态。如果为 0，表示上一个命令正确执行，如果非 0，表示没有正确执行，具体是几，由命令编写者决定 |
+| `$$` | 当前进程的进程号（PID） |
+| `$!` | 后台运行的最后一个进程的进程号（PID） |
+
+```text
+julian@ubuntu2204:~/temp/abc$ ls
+param1.sh
+
+julian@ubuntu2204:~/temp/abc$ echo $?
+0
+
+julian@ubuntu2204:~/temp/abc$ lst
+Command 'lst' not found, but there are 21 similar ones.
+
+julian@ubuntu2204:~/temp/abc$ echo $?
+127
+
+julian@ubuntu2204:~/temp/abc$ ls abc
+ls: cannot access 'abc': No such file or directory
+
+julian@ubuntu2204:~/temp/abc$ echo $?
+2
+```
+
+`&&` 和 `||` 也是通过判断上一个命令的返回值来确定是否有正确执行的。
+
+`param2.sh`
+
+```sh
+#!/usr/bin/bash
+
+echo "current process id: $$"
+
+find /home/julian -name hello.sh &
+echo "last background process id: $!"
+```
+
+命令最后加 `&` 表示把该命令放入后台运行
+
+```text
+julian@ubuntu2204:~/temp/abc$ ./param2.sh 
+current process id: 3834
+last background process id: 3835
+
+julian@ubuntu2204:~/temp/abc$ /home/julian/temp/hello.sh
+
+```
+
+> 最后一条是后台运行的结果。
+
+#### `read`
+
+从标准输入接收输入（类似于 Python 的 `input`）
+
+`read [选项] [变量名]`
+
+```text
+julian@ubuntu2204:~/temp/abc$ read -p "Enter a number:" num
+Enter a number:10
+
+julian@ubuntu2204:~/temp/abc$ echo $num
+10
+```
+
+`-p` 增加提示信息，`-t` 设定等待时间，`-n` 设定最大接收字符数，`-s` 隐秘输入。
+
 ## 10.5 Bash 的运算符
+
+### 10.5.1 数值运算与运算符
+
+Shell 中的变量值默认都是字符串，因此要进行数值计算，如下方法行不通
+
+```text
+julian@ubuntu2204:~$ a=11
+
+julian@ubuntu2204:~$ b=22
+
+julian@ubuntu2204:~$ c=$a+$b
+
+julian@ubuntu2204:~$ echo $c
+11+22
+```
+
+#### `declare`
+
+`declare -p [variable]` 可以查看变量的属性。`-x` 把变量变为环境变量（相当于 `export`）
+
+```text
+julian@ubuntu2204:~$ declare -p a
+declare -- a="11"
+
+julian@ubuntu2204:~$ declare -x a
+
+julian@ubuntu2204:~$ declare -p a
+declare -x a="11"
+
+julian@ubuntu2204:~$ env | grep ^a
+a=11
+```
+
+`-i` 把变量变为数值，因此便可以进行数值运算了。
+
+```text
+julian@ubuntu2204:~$ declare -i c=$a+$b
+
+julian@ubuntu2204:~$ echo $c
+33
+
+julian@ubuntu2204:~$ declare -p c
+declare -i c="33"
+```
+
+> 如果运算符两边有变量不是纯数字，会报错。
+
+#### `expr`
+
+`expr` 也可以进行数值计算，不过运算符两边 **必须有空格**，可以结合 `$()` 进行赋值
+
+```text
+julian@ubuntu2204:~$ expr $a + $b
+33
+
+julian@ubuntu2204:~$ d=$(expr $c + $b)
+
+julian@ubuntu2204:~$ echo $d
+55
+```
+
+如果不加空格就会当字符串对待
+
+```text
+julian@ubuntu2204:~$ expr $a+$b
+11+22
+```
+
+#### `let`
+
+`let` 后跟的表达式不能有空格。
+
+```text
+julian@ubuntu2204:~$ let c=$a-$b
+
+julian@ubuntu2204:~$ echo $c
+-11
+```
+
+#### `$(())` 或 `$[]`
+
+这样就无所谓空不空格了。
+
+```text
+julian@ubuntu2204:~$ e=$(($a+$b))
+
+julian@ubuntu2204:~$ echo $e
+33
+
+julian@ubuntu2204:~$ e=$(( $a + $b ))
+
+julian@ubuntu2204:~$ echo $e
+33
+
+julian@ubuntu2204:~$ e=$[$a + $b]
+
+julian@ubuntu2204:~$ echo $e
+33
+```
+
+### 10.5.2 变量测试与内容替换
+
+
 
 ## 10.6 环境变量配置文件
 
