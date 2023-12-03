@@ -44,7 +44,7 @@ rustc main.rs
 
 会生成一个可执行文件，运行该文件即可打印 `Hello rust`。
 
-## 1.2 Hello, Cargo!
+## 1.3 Hello, Cargo!
 
 使用 `rustc` 来编译源码，可以，但有点繁琐。Cargo 是 Rust 的构建系统和包管理器，适合复杂项目。
 
@@ -469,6 +469,139 @@ print!("\n");
 # 5. 使用结构体组织相关联的数据
 
 ## 5.1 结构体的定义和实例化
+
+### 结构体基本使用
+
+定义结构体
+
+```rust
+struct User {
+    active: bool,
+    username: String,
+    email: String,
+    sign_in_count: u64,
+}
+```
+
+创建实例
+
+```rust
+fn main() {
+    let user1 = User {
+        active: true,
+        username: String::from("someusername123"),
+        email: String::from("someone@example.com"),
+        sign_in_count: 1,
+    };
+}
+```
+
+实例的字段顺序不需要与定义时的一致。
+
+使用结构体的字段
+
+```rust
+println!("name: {}", user1.username);
+```
+
+如果结构体实例是可变的，则可以修改字段
+
+```rust
+fn main() {
+    let mut user1 = User {
+        active: true,
+        username: String::from("username123"),
+        email: String::from("userone@example.com"),
+        sign_in_count: 1,
+    };
+
+    user1.sign_in_count += 1;
+    println!("{} has signed in {} times", user1.username, user1.sign_in_count);
+}
+```
+
+> 注意，不能只指定结构体的某个字段可变。要变整个都变。
+
+结构体实例也是表达式，因此可以放在函数最后返回
+
+```rust
+fn build_user(username: String, email: String) -> User {
+    User { 
+        active: true,
+        username: username,
+        email: email, 
+        sign_in_count: 1
+    }
+}
+
+fn main() {
+    let mut user1 = build_user(
+        String::from("username123"), 
+        String::from("userone@example.com")
+    );
+
+    user1.sign_in_count += 1;
+    println!("{} has signed in {} times", user1.username, user1.sign_in_count);
+}
+```
+
+上述函数中，结构体字段名和函数参数名相同，这种情况也很常见，因此有一种简写语法
+
+```rust
+fn build_user(username: String, email: String) -> User {
+    User { 
+        active: true,
+        username,
+        email, 
+        sign_in_count: 1
+    }
+}
+```
+
+有时候我们创建的新结构体实例的大部分字段与已有的相同，只有部分不同，就可以用结构体更新语法
+
+```rust
+let user2 = User {
+    email: String::from("another@example.com"),
+    ..user1
+};
+println!("{} 's email is {}", user2.username, user2.email);
+```
+
+注意，`..user1` 必须在结构体所有字段的最后，且之后不能有逗号。
+
+`..user1` 这样的更新语法等同于 `=` 赋值，因此也可能会转移所有权。比如上例中，`user1.username` 就被转移了所有权，在创建 `user2` 之后就不能使用 `user1.username` 了，但是 `user.active` 或者 `user.sign_in_count` 还可以使用，因为它们不是堆数据，支持 Copy。
+
+### 元组结构体
+
+元组结构体的字段只有类型而没有名称，使用方法类似元组
+
+```rust
+struct Color(i32, i32, i32);
+struct Point(i32, i32, i32);
+
+fn main() {
+    let grey = Color(127, 127, 127);
+    let center = Point(5, 10, 5);
+
+    println!("R: {}, y: {}", grey.0, center.1);
+}
+```
+
+### 类单元结构体
+
+类单元结构体就跟单元元组类似，没有任何字段，通常用于定义一个不需要存储任何数据只需要实现 trait 的结构体（之后讨论）
+
+```rust
+struct AlwaysEqual;
+
+fn main() {
+    let subject = AlwaysEqual;
+}
+```
+
+
+
 
 ## 5.2 结构体示例程序
 
