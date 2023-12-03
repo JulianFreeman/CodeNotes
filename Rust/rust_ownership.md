@@ -746,4 +746,207 @@ fn return_a_string() -> &String {
 
 # 解决所有权错误
 
+学会如何解决所有权错误是 Rust 的一项核心技能。当借用检查器拒绝编译你的代码时，你该怎么做？在这一章节，我们会讨论几个常见的所有权错误的案例。每一个案例分析都会包含一个无法通过编译的函数，然后我们会解释为什么 Rust 拒绝编译这个函数，并且给出几种解决的方式。
 
+一个常见的情况是理解一个函数 *实际上* 是否是安全的。Rust 总是会拒绝编译不安全的程序[^3]。但是有时候，Rust 也会拒绝安全的程序。这些案例分析会向你展示如何处理这两种情况。
+
+## 修正不安全程序：返回栈上的引用
+
+我们的第一个案例是关于返回栈上的引用的，就像我们在“[数据必须比它所有的引用都活得长](#数据必须比它所有的引用都活得长)”那一节中讨论的那样。下面是这个函数：
+
+```rust
+fn return_a_string() -> &String {
+    let s = String::from("Hello world");
+    &s
+}
+```
+
+> 上述代码无法编译
+
+在思考如何修正这个函数之前，我们要先思考：**为什么这个程序是不安全的**？这里问题的关键在于被引用数据的生命周期上。如果你传递了一个字符串的引用，那你就得保证这个字符串活得得比这个引用长。
+
+根据不同的情况，有四种方式可以延长字符串的生命周期。第一种是把字符串的所有权转交到函数之外，即把 `&String` 改为 `String`：
+
+```rust
+fn return_a_string() -> String {
+    let s = String::from("Hello world");
+    s
+}
+```
+
+第二种是返回一个字符串字面量，这种数据会永远存活（用 `'static` 声明）。当我们不打算修改这个字符串时，也没必要申请堆内存，就可以用这种方式：
+
+```rust
+fn return_a_string() -> &'static str {
+    "Hello world"    
+}
+```
+
+第三种是使用垃圾回收把借用检查推迟到运行时。比如说，你可以使用[引用计数指针](https://doc.rust-lang.org/std/rc/index.html)：
+
+```rust
+use std::rc::Rc;
+fn return_a_string() -> Rc<String> {
+    let s = Rc::new(String::from("Hello world"));
+    Rc::clone(&s)
+}
+```
+
+我们会在第 15 章 [`Rc<T>` 引用计数智能指针](https://rust-book.cs.brown.edu/ch15-04-rc.html)讨论更多关于引用计数的话题。简单来说，`Rc::clone` 只拷贝了指向 `s` 的指针，而没有拷贝数据本身。在运行时，`Rc` 会在最后一个指向数据的 `Rc` 被释放后释放数据。
+
+第四种是让调用者提供一个使用可变引用的字符串“槽”：
+
+```rust
+fn return_a_string(output: &mut String) {
+    output.replace_range(.., "Hello world");
+}
+```
+
+使用这种方式，调用者需要负责为字符串申请空间。这种方式可能会有点繁琐，但是如果调用者需要仔细控制什么时候发生内存申请，那么这种方式可能会更有效。
+
+上述四种方式哪种最合适，会根据背景的不同而不同。但是关键的一点是识别出在这个表面的所有权错误背后的根本问题。我的字符串应该存活多久？谁应该负责释放它？当你对这些问题有一个清晰的答案时，剩下的就是选择什么 API 来解决问题了。
+
+## 修正不安全程序：权限不足
+
+另一个常见的问题是试图修改一个只读数据，或者尝试在引用后释放数据。比如说，我们想要写一个 `stringify_name_with_title` 的函数，这个函数应该使用一个名称向量数组创建一个全名，外加一个头衔：
+
+```rust
+fn stringify_name_with_title(name: &Vec<String>) -> String {
+    name.push(String::from("Esq."));
+    let full = name.join(" ");
+    full
+}
+
+// ideally: ["Ferris", "Jr."] => "Ferris Jr. Esq."
+```
+
+> 上述代码无法编译
+
+编译器会拒绝编译这个程序，因为 `name` 是一个不可变引用，但是 `name.push(..)` 需要有 W 权限。这个程序不安全，是因为 `push` 可能会导致该函数之外的 `name` 的其它引用无效化，像这样：
+
+```rust
+fn main() {
+    let name = vec![String::from("Ferris")];
+    let first = &name[0];
+    stringify_name_with_title(&name);
+    println!("{}", first);
+}
+```
+
+> 上述代码无法编译
+
+在这个例子中，`first` 对 `name[0]` 的引用是在 `stringify_name_with_title` 函数调用之前创建的，函数 `name.push(..)` 会重新申请 `name` 数据的内存，就会导致 `first` 无效化，导致 `println` 试图读取一块已释放的内存。
+
+所以我们该怎么改？其中一种方式是把参数的类型从 `&Vec<String>` 改为 `&mut Vec<String>`：
+
+```rust
+fn stringify_name_with_title(name: &mut Vec<String>) -> String {
+    name.push(String::from("Esq."));
+    let full = name.join(" ");
+    full
+}
+```
+
+但这并不是一个好办法！**函数不应该在调用者不知晓的情况下修改其输入**。一个调用 `stringify_name_with_title` 的人大概不希望这个函数修改了他的向量数组。如果有另一个函数叫 `add_title_to_name` 可能会修改输入，但这不是我们要讨论的情况。
+
+第二种方法是转移参数的所有权，即把 `&Vec<String>` 改为 `Vec<String>`：
+
+```rust
+fn stringify_name_with_title(mut name: Vec<String>) -> String {
+    name.push(String::from("Esq."));
+    let full = name.join(" ");
+    full
+}
+```
+
+但这也不是一个好办法！**很少会有 Rust 函数接管像 `Vec` 和 `String` 这样的堆数据结构的所有权**。上述函数会使得输入的 `name` 不可再使用，这种情况对于调用者来说是挺烦人的，我们在[引用和借用](#引用和借用)的开头讨论过这一点了。
+
+所以说，使用 `&Vec` 其实是对的，这一点我们 *不* 想改变。相反，我们修改函数体本身。根据内存使用多少的不同，会有很多可行的办法，其中一种是把输入 `name` 拷贝一份：
+
+```rust
+fn stringify_name_with_title(name: &Vec<String>) -> String {
+    let mut name_clone = name.clone();
+    name_clone.push(String::from("Esq."));
+    let full = name_clone.join(" ");
+    full
+}
+```
+
+通过拷贝 `name`，我们就可以修改本地拷贝的向量数组了，然而这样拷贝的话会把输入的每一个字符串都拷贝。我们可以通过之后添加后缀的方式避免不必要的拷贝：
+
+```rust
+fn stringify_name_with_title(name: &Vec<String>) -> String {
+    let mut full = name.join(" ");
+    full.push_str(" Esq.");
+    full
+}
+```
+
+总的来说，编写 Rust 函数需要非常认真地权衡如何给予 *合适* 的权限。对这个例子而言，我们通常希望参数 `name` 只有读权限。
+
+## 修正不安全程序：对一个数据结构同时创建别名和进行修改
+
+另一种不安全的操作是使用一个被其他别名释放的堆内存的引用。比如说，下面的函数会获取一个向量数组中最大的字符串的引用，然后在更改向量数组的同时还使用这个引用：
+
+```rust
+fn add_big_strings(dst: &mut Vec<String>, src: &[String]) {
+    let largest: &String = 
+      dst.iter().max_by_key(|s| s.len()).unwrap();
+    for s in src {
+        if s.len() > largest.len() {
+            dst.push(s.clone());
+        }
+    }
+}
+```
+
+> 注意：这个例子使用了迭代器和闭包来简洁地找出最大字符串的引用。我们会在之后的章节中讨论这些功能，现在我们只会提供一些对这些功能的基本理解。
+
+这个程序会被借用检查器拒绝，因为 `let largest = ..` 移除了 `dst` 的 W 权限。然而 `dst.push(..)` 需要有 W 权限。这里我们又要问：**为什么这个程序不安全**？因为 `dst.push(..)` 会重新申请 `dst` 的内存，使得 `largest` 的引用无效化。
+
+要解决这个程序，关键点在于我们要缩短 `largest` 的生命周期，以便不跟 `dst.push(..)` 重叠。其中一种方案是拷贝 `largest`：
+
+```rust
+fn add_big_strings(dst: &mut Vec<String>, src: &[String]) {
+    let largest: String = dst.iter().max_by_key(|s| s.len()).unwrap().clone();
+    for s in src {
+        if s.len() > largest.len() {
+            dst.push(s.clone());
+        }
+    }
+}
+```
+
+然而，这可能会因为申请内存和拷贝字符串数据而造成性能问题。
+
+另一种解决办法是先比较所有的长度，然后再修改 `dst`：
+
+```rust
+fn add_big_strings(dst: &mut Vec<String>, src: &[String]) {
+    let largest: &String = dst.iter().max_by_key(|s| s.len()).unwrap();
+    let to_add: Vec<String> = 
+        src.iter().filter(|s| s.len() > largest.len()).cloned().collect();
+    dst.extend(to_add);
+}
+```
+
+然而这也会因为申请 `to_add` 向量而造成性能问题。
+
+最终的解决办法是只拷贝 `largest` 的长度，因为我们并不需要 `largest` 的内容。这个方案是最常用且性能最高的：
+
+```rust
+fn add_big_strings(dst: &mut Vec<String>, src: &[String]) {
+    let largest_len: usize = dst.iter().max_by_key(|s| s.len()).unwrap().len();
+    for s in src {
+        if s.len() > largest_len {
+            dst.push(s.clone());
+        }
+    }
+}
+```
+
+这些解决办法都有一个共同点：缩短 `dst` 借用的生命周期，以便不跟修改 `dst` 时重叠。
+
+
+
+[^3]: 这里说的是用 Rust 的“安全子集”编写的程序。如果你使用了 `unsafe` 代码或者引用了不安全的组件（比如说调用了 C 库），你必须采取额外的办法来避免未定义行为。
