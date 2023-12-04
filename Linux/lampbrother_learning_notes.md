@@ -2805,6 +2805,65 @@ Shell 的基础正则表达式中不包含 `()`、`+` 和 `?`。这些在扩展�
 
 ## 11.2 字符截取命令
 
+### 11.2.1 `cut` 字段提取命令
+
+`grep` 会在文本中提取符合条件的行，也就是说 `grep` 是按行操作的。
+
+`cut` 则会先把每一行分成不同的段，然后提取每一行的同一段。
+
+分段方式有三种，`-b` 按照字节分段，`-c` 按照字符分段，`-f` 按照 `-d` 指定的分段符分段，默认是 `\t` 制表符。
+
+测试发现在对待中文上 `-b` 和 `-c` 没啥差别。
+
+提取分段的方式有四种：
+
+- n，第 n 段，从 1 计数
+- n-，从第 n 段到最后
+- n-m，从第 n 段到第 m 段（包含）
+- -m，从第 1 段到第 m 段（包含）
+
+要提取多个范围时，用逗号分隔。
+
+`ctext` 是用制表符分隔的。
+
+```text
+julian@ubuntu2204:~/temp$ cat ctext 
+ID	Name	Gender	Mark
+1	Liming	M	86
+2	Sc	M	90
+3	Gao	F	83
+
+julian@ubuntu2204:~/temp$ cut -f 2,3 ctext 
+Name	Gender
+Liming	M
+Sc	M
+Gao	F
+```
+
+`dtext` 是用空格分隔的。
+
+```text
+julian@ubuntu2204:~/temp$ cat dtext 
+ID Name Sex Mark
+1 ZS M 90
+2 LS M 23
+3 WW F 30
+
+julian@ubuntu2204:~/temp$ cut -d " " -f -3 dtext 
+ID Name Sex
+1 ZS M
+2 LS M
+3 WW F
+```
+
+某些命令的输出，比如 `df -h`，其格式是经过程序美化的，每列之间的分隔符不是单纯的一个制表符或者一个空格，而是根据界面的不同而有所不同，因此无法用 `cut` 进行分段。
+
+### 11.2.2 `printf` 命令
+
+### 11.2.3 `awk` 命令
+
+### 11.2.4 `sed` 命令
+
 ## 11.3 字符处理命令
 
 ## 11.4 条件判断
