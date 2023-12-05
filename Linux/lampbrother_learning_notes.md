@@ -2860,11 +2860,200 @@ ID Name Sex
 
 ### 11.2.2 `printf` 命令
 
+`printf` 会按照匹配符的顺序，从参数里一个一个拿数据匹配并格式化输出，匹配完一轮就再重新开始。比如
+
+```text
+julian@ubuntu2204:~/temp$ printf "%s %i\n" abc 12 wed 45
+abc 12
+wed 45
+```
+
 ### 11.2.3 `awk` 命令
+
+入门查看 [AWK 命令](./awk_command.md)。
+
+因为 AWK 按照空白字符分隔段，所以可以处理 `df -h` 这样的输出
+
+```text
+julian@ubuntu2204:~/temp$ df -h | grep "/$" | awk '{print "root disk part used " $5}'
+root disk part used 29%
+```
+
+等同于
+
+```text
+julian@ubuntu2204:~/temp$ df -h | awk '/\/$/ {print "root disk part used " $5}'
+root disk part used 29%
+```
 
 ### 11.2.4 `sed` 命令
 
+sed 是一个轻量级流编辑器，不同于 vim 只能编辑文件，sed 除了能编辑文件，也能编辑其他命令的输出结果。
+
+`sed` 命令的格式
+
+```text
+sed [选项] '[动作]' 流
+```
+
+选项
+
+- `-n`：只输出经过 `sed` 命令处理的行
+- `-i`：用 `sed` 的修改结果替换原文件
+
+动作
+
+- `a`：追加行
+- `c`：替换行
+- `i`：插入行
+- `d`：删除行
+- `p`：打印行
+- `s`：字符串替换，格式为 `s/old/new/g`
+
+后面的示例中使用的文件
+
+```text
+julian@ubuntu2204:~/temp$ cat ctext 
+ID	Name	Gender	Mark
+1	Liming	M	86
+2	Sc	M	90
+3	Gao	F	83
+```
+
+打印第 2 行内容
+
+```text
+julian@ubuntu2204:~/temp$ sed '2p' ctext 
+ID	Name	Gender	Mark
+1	Liming	M	86
+1	Liming	M	86
+2	Sc	M	90
+3	Gao	F	83
+```
+
+但是除了第二行，其他行也都打印了，因此要加 `-n`
+
+```text
+julian@ubuntu2204:~/temp$ sed -n '2p' ctext 
+1	Liming	M	86
+```
+
+删除第 2-3 行
+
+```text
+julian@ubuntu2204:~/temp$ sed '2,3d' ctext 
+ID	Name	Gender	Mark
+3	Gao	F	83
+```
+
+但是此时只是输出内容没了 2-3 行，实际的文件还是没变的，因为没加 `-i` 选项。
+
+在第 2 行后追加 `hello world`
+
+```text
+julian@ubuntu2204:~/temp$ sed '2a hello world' ctext 
+ID	Name	Gender	Mark
+1	Liming	M	86
+hello world
+2	Sc	M	90
+3	Gao	F	83
+```
+
+追加多行
+
+```text
+julian@ubuntu2204:~/temp$ sed '2a hello \
+> world' ctext
+ID	Name	Gender	Mark
+1	Liming	M	86
+hello 
+world
+2	Sc	M	90
+3	Gao	F	83
+```
+
+在第 2 行前加入 `hello world`
+
+```text
+julian@ubuntu2204:~/temp$ sed '2i hello world' ctext 
+ID	Name	Gender	Mark
+hello world
+1	Liming	M	86
+2	Sc	M	90
+3	Gao	F	83
+```
+
+将第二行替换为 `hello world`
+
+```text
+julian@ubuntu2204:~/temp$ sed '2c hello world' ctext 
+ID	Name	Gender	Mark
+hello world
+2	Sc	M	90
+3	Gao	F	83
+```
+
+替换特定字符串
+
+```text
+julian@ubuntu2204:~/temp$ sed 's/Liming/LM/g' ctext 
+ID	Name	Gender	Mark
+1	LM	M	86
+2	Sc	M	90
+3	Gao	F	83
+```
+
+多个条件用分号分隔
+
+```text
+julian@ubuntu2204:~/temp$ sed 's/Liming/LM/g;3c hello world' ctext 
+ID	Name	Gender	Mark
+1	LM	M	86
+hello world
+3	Gao	F	83
+```
+
+以上的所有操作如果想修改原文件，加 `-i` 选项，不过一般不会去修改原文件。
+
 ## 11.3 字符处理命令
+
+### `sort`
+
+`sort` 命令可以把文件或者流中的数据按照行的字母顺序排序
+
+```text
+julian@ubuntu2204:~/temp$ cat ctext 
+root:x:0
+julian:x:10
+liz:x:2
+karl:x:11
+
+julian@ubuntu2204:~/temp$ sort ctext 
+julian:x:10
+karl:x:11
+liz:x:2
+root:x:0
+```
+
+`-t` 可以指定行的分隔符，默认是制表符，`-k n[,m]` 可以指定按照从第 n 行到第 m 行排序
+
+```text
+julian@ubuntu2204:~/temp$ sort -t ":" -k 3,3 ctext 
+root:x:0
+julian:x:10
+karl:x:11
+liz:x:2
+```
+
+`-n` 可以指定按照数值排序，默认是字符串
+
+```text
+julian@ubuntu2204:~/temp$ sort -n -t ":" -k 3 ctext 
+root:x:0
+liz:x:2
+julian:x:10
+karl:x:11
+```
 
 ## 11.4 条件判断
 
