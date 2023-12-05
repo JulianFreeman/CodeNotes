@@ -3057,5 +3057,333 @@ karl:x:11
 
 ## 11.4 条件判断
 
+### 按照文件类型判断
+
+| 选项 | 作用 |
+|--|--|
+| `-b` | 存在且为块设备文件 |
+| `-c` | 存在且为字符设备文件 |
+| `-d` | 存在且为目录文件 |
+| `-e` | 存在 |
+| `-f` | 存在且为普通文件 |
+| `-L` | 存在且为符号链接文件 |
+| `-p` | 存在且为管道文件 |
+| `-s` | 存在且文件非空 |
+| `-S` | 存在且为套接字文件 |
+
+判断有两种写法
+
+```text
+test -e file
+[ -e file ]
+```
+
+两者都不会有返回结果，要查看结果需要用 `echo $?`，为 0 则存在，其他则不存在。
+
+因为条件判断主要用在 Shell 脚本中，所以第二种更常用。（第二种用法的中括号两侧必须有空格）
+
+常用的选项有 `-d`，`-e`，`-f`。
+
+### 按照文件权限判断
+
+| 选项 | 作用 |
+|--|--|
+| `-r` | 存在且有读权限 |
+| `-w` | 存在且有写权限 |
+| `-x` | 存在且有执行权限 |
+| `-u` | 存在且有 SUID 权限 |
+| `-g` | 存在且有 SGID 权限 |
+| `-k` | 存在且有 SBIT 权限 |
+
+这里的权限并不区分所有者或者所属组或者其他人，只要任意一方有相应权限，就会返回真。
+
+常用的选项有 `-r`，`-w`，`-x`。
+
+### 两个文件之间比较
+
+| 选项 | 作用 |
+|--|--|
+| `file1 -nt file2` | file1 的修改时间比 file2 新 |
+| `file1 -ot file2` | file1 的修改时间比 file2 旧 |
+| `file1 -ef file2` | file1 和 file2 的 inode 号一致 |
+
+### 两个整数之间比较
+
+| 选项 | 作用 |
+|--|--|
+| `int1 -eq int2` | int1 等于 int2 |
+| `int1 -ne int2` | int1 不等于 int2 |
+| `int1 -gt int2` | int1 大于 int2 |
+| `int1 -lt int2` | int1 小于 int2 |
+| `int1 -ge int2` | int1 大于等于 int2 |
+| `int1 -le int2` | int1 小于等于 int2 |
+
+### 字符串判断
+
+| 选项 | 作用 |
+|--|--|
+| `-z string` | 字符串为空 |
+| `-n string` | 字符串非空 |
+| `str1 == str2` | str1 等于 str2 |
+| `str1 != str2` | str1 不等于 str2 |
+
+`==` 会把两侧的值当作字符串判断，`-eq` 会把两侧的值当作数值判断。
+
+### 多重条件判断
+
+| 选项 | 作用 |
+|--|--|
+| `cond1 -a cond2` | 条件1 与 条件2 |
+| `cond1 -o cond2` | 条件1 或 条件2 |
+| `! cond` | 非 条件 |
+
 ## 11.5 流程控制
+
+### 11.5.1 `if` 语句
+
+查看 `help if` 可以看到比较简洁的 `if` 语句写法
+
+```text
+if COMMANDS; then COMMANDS; [ elif COMMANDS; then COMMANDS; ]... [ else COMMANDS; ] fi
+```
+
+比如
+
+```text
+julian@ubuntu2204:~/temp$ if [ -e gtext ]; then echo yes; else echo no; fi
+yes
+```
+
+分开层次之后，可以这样
+
+```sh
+if [ -e gtext ]; then
+    echo yes
+else
+    echo no
+fi
+```
+
+其中 `then` 前面的分号必须要有
+
+也可以这样
+
+```sh
+if [ -e gtext ]
+then
+    echo yes
+else
+    echo no
+fi
+```
+
+此时 `if` 那一行最后就可以不要分号。
+
+### 11.5.2 `case` 语句
+
+如下例
+
+```sh
+#!/usr/bin/bash
+
+read -p "Enter y/n: " choice
+
+case $choice in
+    "y")
+        echo "you choose yes"
+        ;;
+    "n")
+        echo "you choose no"
+        ;;
+    *)
+        echo "don't know what you choose"
+        ;;
+esac
+```
+
+以 `case $var in` 开头，每个条件用 `pattern)` 指定，每一分支最后用 `;;` 表示中断，类似于 `break`，最后的 `*)` 表示前面都不符合时执行的分支。
+
+`pattern` 也可以有好几个，比如
+
+```sh
+#!/usr/bin/bash
+
+read -p "Enter y/n: " choice
+
+case $choice in
+    "y" | "yes")
+        echo "you choose yes"
+        ;;
+    "n" | "no")
+        echo "you choose no"
+        ;;
+    *)
+        echo "don't know what you choose"
+        ;;
+esac
+```
+
+通常在提供不同的选项列表时会用 `case` 判断用户选择了哪个选项。
+
+### 11.5.3 `for` 循环
+
+#### 语法一：不定次数循环
+
+语法格式
+
+```text
+for NAME [in WORDS ... ] ; do COMMANDS; done
+```
+
+`WORDS` 会按照 **空格或换行符** 分隔成段并分别赋值给 `NAME`
+
+```sh
+#!/usr/bin/bash
+
+for time in morning noon afternoon evening; do
+    echo "now is $time"
+done
+```
+
+当然，跟 `if` 一样，如果 `for` 中的 `do` 写在第二行，就不需要分号了
+
+```sh
+#!/usr/bin/bash
+
+for time in morning noon afternoon evening
+do
+    echo "now is $time"
+done
+```
+
+示例：批量解包脚本
+
+```sh
+#!/usr/bin/bash
+
+ls *.tar.gz > tar_gz.log
+for t in $(cat tar_gz.log)
+do
+    tar -zxf $t &>/dev/null
+done
+
+rm -f tar_gz.log
+```
+
+#### 语法二：确定次数循环
+
+如下例
+
+```sh
+#!/usr/bin/bash
+
+s=0
+for (( i=1;i<=100;i++ ))
+do
+    s=$(( $s+$i ))
+done
+echo "The sum of 1..100 is $s"
+```
+
+注意，`for` 后面是双括号，只有双括号里的才是数值运算。
+
+示例：批量创建用户
+
+```sh
+#!/usr/bin/bash
+
+read -p "The default user name: " -t 30 name
+read -p "The number of users you wanna create: " -t 30 num
+
+if [ -n "$name" -a -n "$num" ]
+then
+    y=$( echo $num | sed 's/[0-9]\+//1' )
+    if [ -z $y ]
+    then
+        for (( i=1;i<=$num;i++ ))
+        do
+            echo "$name$i is created"
+        done
+    else
+        echo "$num is not a pure number; ($y)"
+    fi
+else
+    echo "name or num is empty; ($name)($num)"
+fi
+```
+
+这里几个点要注意下：
+
+第一个 `if` 中判断变量是不是空时，`"$name"` 用双引号括起来，因为如果 `$name` 真的是空，且没有双引号，那么这个 `if` 可能就会变成形如 `if [ -n -a -n "3" ]` 的格式，而这是有语法错误的，用双引号括起来之后，即便为空，也是个空字符串，不会造成语法错误。
+
+`sed 's/[0-9]\+//1'` 表示匹配 **一个或多个** 数字 **一次**，并替换为空，其等同于 `sed 's/[0-9]//g'`，表示匹配 **一个** 数字，但 **多次** 替换为空。也就是说，前者匹配多个连续的数字，但只替换一次，后者只匹配一个数字，但全部替换。
+
+但是这里说的等同，是指在这个示例中作用是等同的，但它们两个的实际效果并不等同，比如
+
+```text
+julian@ubuntu2204:~/temp$ echo 123g456 | sed 's/[0-9]//g'
+g
+
+julian@ubuntu2204:~/temp$ echo 123g456 | sed 's/[0-9]\+//1'
+g456
+```
+
+如果末尾是 `2`，表示替换第二个匹配，而不是前两个
+
+```text
+julian@ubuntu2204:~/temp$ echo 123g456 | sed 's/[0-9]\+//2'
+123g
+```
+
+### 11.5.4 `while` 循环与 `until` 循环
+
+`while` 语法格式
+
+```text
+while COMMANDS; do COMMANDS; done
+```
+
+```sh
+#!/usr/bin/bash
+
+s=0
+i=1
+while [ $i -le 100 ]
+do
+    s=$(( $s+$i ))
+    i=$(( $i+1 ))
+done
+echo "The sum of 1..100 is $s"
+```
+
+> `i=$(( $i+1 ))` 等同于 `i=$(( i+1 ))` 等同于 `i=$(( ++i ))`
+
+`until` 语法格式
+
+```text
+until COMMANDS; do COMMANDS; done
+```
+
+跟 `while` 差不多，但是判断条件相反，`until` 是当条件不成立时执行循环
+
+```sh
+#!/usr/bin/bash
+
+s=0
+i=1
+until [ $i -gt 100 ]
+do
+    s=$(( $s+$i ))
+    i=$(( $i+1 ))
+done
+echo "The sum of 1..100 is $s"
+```
+
+# 第十二讲 Linux 服务管理
+
+## 12.1 服务简介与分类
+
+## 12.4 服务管理总结
+
+
 
