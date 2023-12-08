@@ -3681,6 +3681,130 @@ Codename:	jammy
 
 ## 14.1 日志管理简介
 
+查询一下日志服务是否开启
+
+```text
+julian@gallifrey:~/temp$ ps aux | grep rsyslogd
+syslog       472  0.0  0.0 222400  6144 ?        Ssl  18:01   0:00 /usr/sbin/rsyslogd -n -iNONE
+julian     76478  0.0  0.0   9208  2560 pts/0    S+   21:22   0:00 grep --color=auto rsyslogd
+```
+
+有第一行就代表开启了。
+
+### 常见日志
+
+| 日志文件 | 说明 |
+|--|--|
+| `/var/log/cups/` | 记录打印信息的日志 |
+| `/var/log/dmesg` | 记录了系统开机内核自检信息，`dmesg` 命令就是直接查看的该文件 |
+| `/var/log/btmp` | 记录错误登录的日志，是二进制文件，需要用 `lastb` 命令查看 |
+| `/var/log/lastlog` | 记录所有用户最后一次登录时间的日志，用 `lastlog` 命令查看 |
+| `/var/log/wtmp` | 记录所有用户的登录和注销信息，用 `last` 查看 |
+
 ## 14.2 `rsyslogd` 日志服务
 
+`/var/log` 下的日志基本都是采用的相同的日志格式，也是 `rsyslogd` 能识别的格式：
+
+- 事件产生的时间
+- 发生事件的服务器主机名
+- 产生事件的服务名或程序名
+- 事件的具体信息
+
+`/etc/rsyslog.conf` 文件记录了要记录什么样的日志。具体的配置格式见 `/etc/rsyslog.d/50-default.conf`。
+
+日志分等级
+
+| 等级名称 | 说明 |
+|--|--|
+| debug | 一般调试信息 |
+| info | 基本通知信息 |
+| notice | 普通信息，但有一定重要性 |
+| warning | 警告信息，但还不会影响到系统或服务运行 |
+| err | 错误信息，可能会影响系统或服务运行了 |
+| crit | 临界状况信息 |
+| alert | 预警信息，必须立刻采取行动 |
+| emerg | 紧急信息，系统已无法使用了 |
+
+日志格式一般为 `[服务名].[日志等级] [路径]`。
+
+例如 `authpriv.*` 表示记录 `authpriv` 服务产生的所有日志信息。`mail.err` 表示记录 `mail` 服务产生的高于或等于 err 等级的日志信息（也就是 err、crit、alert 和 emerg）。`*.=emerg` 表示记录任何服务产生的 emerg 等级的日志，其他等级不记录。`.!` 表示除了指定的等级不记录，其他等级都记录。
+
+路径可以是日志文件的绝对路径，也可以是设备文件，比如 `/dev/lp0` 是个打印机设备，记录日志时直接打印，也可以是远程主机 `@192.168.x.y:abc`，也可以是用户名（用户要在线才能收到），或者丢弃用 `~`。
+
+当然最常用的还是日志文件绝对路径。
+
 ## 14.3 日志轮替
+
+日志如果始终都记录在一个文件中，总有一天这个文件会大到打不开。因此涉及到日志记录，有两样事情要做，一个是分割，也就是把大文件分成小文件，另一个是轮替，也就是隔一段时间生成新的日志文件，清理旧的日志文件。
+
+日志轮替时对于日志文件的命名有两种方式，
+
+第一种，假设今天的日志文件叫 `logfile`，到第二天的时候，把 `logfile` 改为 `logfile-{昨天的日期}`，比如 `logfile-20231206`，然后今天的日志保存在新文件 `logfile` 中。这样当天的日志文件永远叫 `logfile`，之前的日志文件则都有日期标注。
+
+第二种，同样假设今天的日志文件叫 `logfile`，到第二天时，把 `logfile` 改为 `logfile.1`，然后今天的日志保存在新文件 `logfile` 中。到第三天时，把 `logfile.1` 改为 `logfile.2`，把 `logfile` 改为 `logfile.1`，然后当天日志保存在新文件 `logfile` 中。这样当天的日志文件永远叫 `logfile`，之前的则有数字标记，数字越小距离当天越近。
+
+`/etc/logrotate.conf` 配置文件保存了日志轮替的相关设置。
+
+| 参数 | 作用 |
+|--|--|
+| `daily` | 轮替周期为每天 |
+| `weekly` | 轮替周期为每周 |
+| `monthly` | 轮替周期为每月 |
+| `rotate [数字]` | 保留的日志文件个数，0 表示不保留 |
+| `create` | 轮替时创建新的日志文件 |
+| `dateext` | 使用上述第一种日志命名方式，否则使用第二种 |
+| `compress` | 压缩旧日志文件 |
+| `missingok` | 如果日志不存在，忽略警告信息 |
+| `notifempty` | 如果日志文件为空，则不轮替 |
+| `minsize [大小]` | 轮替的最小值，达到这个值才会发生轮替，否则哪怕时间到了也不轮替 |
+| `size [大小]` | 日志大于指定大小才轮替，不按照时间轮替，比如 `size 100k` |
+
+该配置文件也包含了 `/etc/logrotate.d` 下的文件，方便各服务单独配置自己的轮替规则。
+
+各文件的格式形如
+
+```text
+[日志文件绝对路径] {
+    各种参数设置
+}
+```
+
+`logrotate -f [配置文件名]` 可以强制发生日志轮替。
+
+# 第十五讲 启动管理
+
+## 15.1 启动管理
+
+### 15.1.1 系统运行级别
+
+| 运行级别 | 含义 |
+|--|--|
+| 0 | 关机 |
+| 1 | 单用户模式，类似 Windows 的安全模式，启动最少的服务，主要用于系统修复 |
+| 2 | 不完全的命令行模式，不包含 NFS 服务 |
+| 3 | 完全的命令行模式 |
+| 4 | 系统保留 |
+| 5 | 图形模式 |
+| 6 | 重启 |
+
+NFS 服务是一个 Linux 系统之间文件共享的服务，不安全，所以单独有一个级别把它去掉了。
+
+单用户模式虽然启动的服务少，但还是从硬盘启动的，有些错误还是修复不了，如果使用光盘启动，理论上能修复的错误更多一些。
+
+`runlevel` 显示当前运行级别。`init [级别]` 可以切换运行级别。
+
+参考 [Where is the inittab file?](https://askubuntu.com/questions/34308/where-is-the-inittab-file)
+
+> **Back in the days** the "System-V" init service was used in Ubuntu, and it used the /etc/inittab file.  
+> **Some time ago** (around 2006) the "Upstart" init service replaced SysV. During these days you could follow the top answer and use man inittab to get info on this change.  
+> **At the time of writing** (e.g. for Ubuntu 16.04) the "systemd" boot process is in use and there is no reference left to "inittab" (e.g. if you do apropos inittab you'll probably not find anything). Instead you could do man runlevel to get similar information.  
+> **Bottom line**: the /etc/inittab file is nowhere, likely because you use a newer version for Ubuntu that has a different init service, e.g. systemd.
+
+> `systemctl get-default` 可以查看当前的默认运行级别，`systemctl set-default` 可以修改。
+
+### 15.1.2 启动过程
+
+## 15.2 启动引导程序 `grub`
+
+## 15.3 系统修复模式
+
