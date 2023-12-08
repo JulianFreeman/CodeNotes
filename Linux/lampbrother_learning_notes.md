@@ -3401,6 +3401,10 @@ echo "The sum of 1..100 is $s"
 
 操作服务本质上可以使用上述这种用绝对路径直接指明服务文件的方法，但是也可以使用一些服务管理工具，比如 `service` 和 `systemctl`，两者用法上有些不同，不过功能差不多。
 
+通过二进制包安装的服务，可以由系统管理，通过源码包安装的服务，一般默认在 `/usr/local` 下，而不是分散在各个目录中，这些服务默认不由系统管理，需要手动管理。
+
+服务除了常规的操作其开启或关闭之外，也可以设置是否开机自启动。
+
 > 其他内容研究研究再来补充。
 
 # 第十三讲 Linux 进程管理
@@ -3804,7 +3808,105 @@ NFS 服务是一个 Linux 系统之间文件共享的服务，不安全，所以
 
 ### 15.1.2 启动过程
 
+略。
+
 ## 15.2 启动引导程序 `grub`
+
+Ubuntu 22.04.3 的启动配置貌似在 `/etc/default/grub` 文件中。
+
+> 其他内容略。
+
+服务器不同于个人机，频繁更新并不一定合适。一方面新的软件可能不稳定，另一方面更新后可能有些地方需要重新配置，也会耽误时间。
+
+> grub 加密？
 
 ## 15.3 系统修复模式
 
+进入单用户模式，可以修改 root 密码，修改系统默认运行级别。
+
+实在不行，就用光盘修复模式。
+
+# 第十六讲 备份和恢复
+
+## 16.1 备份概述
+
+完全备份：每次都备份完整数据，备份的数据量大，但是恢复时方便快捷。
+
+增量备份：每次只备份与上一次相比新增加的数据，备份时数据量小，但恢复时需要逐步恢复，比较麻烦。
+
+差异备份：每次都是跟第一次的完整备份相比，备份新增的数据。这算是一个完全备份和增量备份的折中策略。
+
+## 16.2 `dump` 和 `restore` 命令
+
+### `dump`
+
+在 Ubuntu 22.04.3 中，`dump` 默认没有安装，使用 `sudo apt install dump` 安装。
+
+选项有 `-0` 完全备份，`-1` 第一次增量备份，`-9` 第九次增量备份。`-f` 指定备份后的文件名。`-u` 备份后把日志写在 `/var/lib/dumpdates` 文件中。`-j` 按照 bz2 格式压缩。
+
+`-W` 选项可以看到不同分区的备份信息。
+
+如果按照分区备份，可以使用 `-u` 记录在文件，如果不按照分区备份，只是备份分区中的某一个子目录，则不能用 `-u` 记录日志，且只能使用 `-0` 完全备份。
+
+```text
+root@gallifrey:~/temp# dump -0uj -f boot.bak.bz2 /boot/
+  DUMP: You can't update the dumpdates file when dumping a subdirectory
+  DUMP: The ENTIRE dump is aborted.
+
+root@gallifrey:~/temp# dump -0j -f boot.bak.bz2 /boot
+  DUMP: Date of this level 0 dump: Fri Dec  8 10:40:53 2023
+  DUMP: Dumping /dev/nvme0n1p4 (/ (dir boot)) to boot.bak.bz2
+  DUMP: Label: none
+  DUMP: Writing 10 Kilobyte records
+  DUMP: Compressing output at transformation level 2 (bzlib)
+  DUMP: mapping (Pass I) [regular files]
+  DUMP: mapping (Pass II) [directories]
+  DUMP: estimated 196288 blocks.
+  DUMP: Volume 1 started with block 1 at: Fri Dec  8 10:40:53 2023
+  DUMP: dumping (Pass III) [directories]
+  DUMP: dumping (Pass IV) [regular files]
+  DUMP: Closing boot.bak.bz2
+  DUMP: Volume 1 completed at: Fri Dec  8 10:41:15 2023
+  DUMP: Volume 1 took 0:00:22
+  DUMP: Volume 1 transfer rate: 8016 kB/s
+  DUMP: Volume 1 196260kB uncompressed, 176367kB compressed, 1.113:1
+  DUMP: 196260 blocks (191.66MB) on 1 volume(s)
+  DUMP: finished in 22 seconds, throughput 8920 kBytes/sec
+  DUMP: Date of this level 0 dump: Fri Dec  8 10:40:53 2023
+  DUMP: Date this dump completed:  Fri Dec  8 10:41:15 2023
+  DUMP: Average transfer rate: 8016 kB/s
+  DUMP: Wrote 196260kB uncompressed, 176367kB compressed, 1.113:1
+  DUMP: DUMP IS DONE
+
+root@gallifrey:~/temp# ls -lh
+total 173M
+-rw-r--r-- 1 root root 173M Dec  8 10:41 boot.bak.bz2
+
+root@gallifrey:~/temp# dump -W
+Last dump(s) done (Dump '>' file systems):
+  /dev/nvme0n1p4	(     /) Last dump: never
+
+root@gallifrey:~/temp# cat /var/lib/dumpdates 
+
+root@gallifrey:~/temp# dump -1j -f boot.bak1.bz2 /boot
+  DUMP: Only level 0 dumps are allowed on a subdirectory
+  DUMP: The ENTIRE dump is aborted.
+```
+
+### `restore`
+
+该命令常用的模式有四种，不能混用
+
+模式：
+
+`-C` 比较备份数据和实际数据的变化（貌似比较分区下的子目录时会有些问题）
+
+`-i` 交互模式，手动选择恢复的文件
+
+`-t` 查看模式，查看备份文件中有哪些数据
+
+`-r` 还原模式，用于数据还原（实际上就是把备份文件解压缩到当前目录，然后手动拷贝需要的）
+
+选项：
+
+`-f` 指定备份文件名
