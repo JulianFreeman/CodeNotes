@@ -5,3 +5,7 @@
 # awk_command
 
 https://www.geeksforgeeks.org/awk-command-unixlinux-examples/ 的翻译。
+
+# change_timezone
+
+https://linuxize.com/post/how-to-set-or-change-timezone-in-linux/ 的翻译。
