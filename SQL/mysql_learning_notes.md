@@ -6,6 +6,10 @@
 
 网址：https://dev.mysql.com/downloads/mysql/
 
+Windows 安装后需要把 `C:\Program Files\MySQL\MySQL Server 8.2\bin` 添加到环境变量。
+
+MacOS 安装后需要在 `~/.zshrc` 文件中添加 `export PATH=${PATH}:/usr/local/mysql/bin`。
+
 ### Ubuntu
 
 ```sh
@@ -442,5 +446,12 @@ WHERE
 
 结果一样。
 
+## `LIMIT`
+
+语法 `LIMIT [offset,] row_count`，可以理解为，先跳过 `offset` 行，再限定输出 `row_count` 行。
+
+所以，`LIMIT 0, row_count` 和 `LIMIT row_count` 是一样的。
+
+一般 `LIMIT` 都是跟 `ORDER BY` 一起用的。
 
 
