@@ -161,7 +161,7 @@ SELECT trackid, name FROM tracks LIMIT 20 OFFSET 10;
 
 | 运算符 | 含义 |
 | --- | --- |
-| =  | 等以 |
+| =  | 等于 |
 | <> 或者 !=  | 不等于 |
 | <  | 小于 |
 | >  | 大于 |
