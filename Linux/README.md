@@ -9,3 +9,7 @@ https://www.geeksforgeeks.org/awk-command-unixlinux-examples/ 的翻译。
 # change_timezone
 
 https://linuxize.com/post/how-to-set-or-change-timezone-in-linux/ 的翻译。
+
+# nginx_learning_notes
+
+燕十八 nginx 视频教程的笔记。
