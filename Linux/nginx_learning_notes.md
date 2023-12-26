@@ -143,3 +143,48 @@ location / {
 
 # 03 nginx 虚拟主机配置
 
+nginx 本身也有一些命令，与信号控制功能类似，比如 `nginx -s reload` 重读配置文件，`nginx -s reopen` 日志轮替，`nginx -s stop` 终止服务等。
+
+`nginx -t` 可以测试配置文件语法是否正确，避免在修改配置文件后改错导致服务起不来。这个需要管理员权限。
+
+nginx 配置文件的相关参数：
+
+`worker_processes`：二进制包安装的 nginx 该值为 `auto`，源码包安装的 nginx 该值为 `1`；表示工作进程的数量。一般为 CPU 数 * 核数。
+
+`events`：配置 nginx 连接的属性。
+
+`events/worker_connections`：每个工作进程允许的最大连接数量。默认是 `1024`，可以改大，但是太大也没意义。
+
+`http`：配置 http 服务器的部分。其下又有好几个 `server` 的部分，实际上每个 `server` 就是一个虚拟主机。在二进制包安装的 nginx 下，每一个 `server` 被放置在 `/etc/nginx/conf.d/*.conf` 文件中，在源码包安装的 nginx 下则直接在 `http` 字段下。
+
+一个简单的 `server` 需要的内容不多，下面简单创建一个：
+
+在 `/etc/nginx/conf.d/` 目录下创建一个 `jhome.conf` 文件，然后写入如下内容
+
+```text
+server {
+    listen 80;
+    server_name jhome.me;
+
+    location / {
+        root /usr/share/nginx/jhome;
+        index index.html;
+    }
+}
+```
+
+这是一个最简单的可用的 `server` 了：监听哪个端口，使用哪个域名（当然这里可以是纯 IP 地址），网站文件的根目录在哪里。
+
+然后在 `/usr/share/nginx/jhome` 下创建 `index.html` 文件，并写入一些内容。
+
+然后运行 `sudo nginx -s reload` 重读配置文件。
+
+此时访问 `jhome.me` 肯定不行，因为浏览器不认识这个域名，我们需要在 hosts 文件中指定该域名的 IP 地址为服务器的地址。
+
+添加完成后再访问 `jhome.me`，就能看到刚才 `/usr/share/nginx/jhome/index.html` 文件中的内容了。
+
+当然这个配置里没有什么是必须的，监听端口可以任意指定，域名也可以随便写，网站根目录也可以在任意目录，只不过有些是约定俗成的。
+
+在浏览器里输入一个网址时如果不指定端口，默认就是 80 端口，但是也可以指定。比如如果上述 `server` 的监听端口是 `2023`，那么访问时就应该写 `jhome.me:2023`。
+
+# 04 nginx 日志管理
