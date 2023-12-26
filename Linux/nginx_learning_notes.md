@@ -188,3 +188,42 @@ server {
 在浏览器里输入一个网址时如果不指定端口，默认就是 80 端口，但是也可以指定。比如如果上述 `server` 的监听端口是 `2023`，那么访问时就应该写 `jhome.me:2023`。
 
 # 04 nginx 日志管理
+
+继续来看 `/etc/nginx/nginx.conf` 文件的 `http` 字段，有如下部分
+
+```text
+log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                  '$status $body_bytes_sent "$http_referer" '
+                  '"$http_user_agent" "$http_x_forwarded_for"';
+access_log  /var/log/nginx/access.log  main;
+```
+
+这里定义了服务器的日志文件路径及格式。
+
+第一部分 `log_format` 定义了一种日志格式，即最后那串很长的字符串，然后给这种格式命名为 `main`，在后面定义日志文件路径的同时指定使用 `main` 格式。
+
+我们也可以在每一个 `server` 里单独指定日志文件的路径及格式。
+
+比如修改前面的 `server` 为
+
+```text
+server {
+    listen 2023;
+    server_name jhome.me;
+
+    location / {
+        root /usr/share/nginx/jhome;
+        index index.html;
+    }
+
+    access_log /var/log/nginx/jhome.me.access.log main;
+}
+```
+
+此时访问 `jhome.me:2023`，日志文件就会以 `main` 的格式写入到 `/var/log/nginx/jhome.me.access.log` 中了。
+
+# 05 nginx 定时任务完成日志切割
+
+日志切割就是在信号量那里说的，重命名日志文件后创建新的日志文件，然后通知 nginx 进行日志轮替，只不过这个步骤换成用脚本完成，然后设置定时任务。具体脚本这里就不写了。
+
+# 06 Location 详解之精准匹配
