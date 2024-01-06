@@ -13,3 +13,7 @@ https://linuxize.com/post/how-to-set-or-change-timezone-in-linux/ 的翻译。
 # nginx_learning_notes
 
 燕十八 nginx 视频教程的笔记。
+
+# lnmp_installation_notes
+
+LNMP + Wordpress 安装笔记
