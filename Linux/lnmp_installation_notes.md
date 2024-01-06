@@ -326,6 +326,251 @@ try {
 
 浏览器访问 http://[ip]/todo_list.php，如果看到 TODO 清单，则测试通过。
 
+# 创建证书
 
+WordPress 需要证书。我没有试过没有证书的话会怎样，但不管怎么说，先创建一个吧。
 
+## 无域名自签名证书
 
+自签名证书，顾名思义，就是自己给自己签名的证书，不能被浏览器信任，不过也算是个证书了。
+
+> 以下内容暂时不理解啥意思，纯粹照葫芦画瓢。葫芦地址：https://www.digitalocean.com/community/tutorials/how-to-create-a-self-signed-ssl-certificate-for-nginx-in-ubuntu-22-04
+
+创建 TLS 证书
+
+```sh
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/nginx-selfsigned.key -out /etc/ssl/certs/nginx-selfsigned.crt
+```
+
+这一步会创建密钥和证书，同时需要提供一些用于记录在证书上的信息，其中最重要的是 `Common Name`，也就是域名，这里就是服务器 IP 地址。
+
+创建这个不知道是什么的 DH 组，这一步会十分花时间
+
+```sh
+sudo openssl dhparam -out /etc/nginx/dhparam.pem 4096
+```
+
+接下来创建配置文件让 nginx 使用前面创建的证书。
+
+首先创建一个配置样板，指向前面的 SSL 密钥和证书（此处的文件名并非强制要求）（如果没有 `snippets` 目录要先创建）
+
+```sh
+sudo vim /etc/nginx/snippets/self-signed.conf
+```
+
+填入如下内容
+
+```text
+ssl_certificate /etc/ssl/certs/nginx-selfsigned.crt;
+ssl_certificate_key /etc/ssl/private/nginx-selfsigned.key;
+```
+
+然后创建另一个配置样板，并填入一些 SSL 配置
+
+```sh
+sudo vim /etc/nginx/snippets/ssl-params.conf
+```
+
+```text
+ssl_protocols TLSv1.3;
+ssl_prefer_server_ciphers on;
+ssl_dhparam /etc/nginx/dhparam.pem; 
+ssl_ciphers EECDH+AESGCM:EDH+AESGCM;
+ssl_ecdh_curve secp384r1;
+ssl_session_timeout  10m;
+ssl_session_cache shared:SSL:10m;
+ssl_session_tickets off;
+ssl_stapling on;
+ssl_stapling_verify on;
+resolver 8.8.8.8 8.8.4.4 valid=300s;
+resolver_timeout 5s;
+# Disable strict transport security for now. You can uncomment the following
+# line if you understand the implications.
+#add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload";
+add_header X-Frame-Options DENY;
+add_header X-Content-Type-Options nosniff;
+add_header X-XSS-Protection "1; mode=block";
+```
+
+下面配置 nginx 以使用 SSL。
+
+首先打开网站的配置文件（比如 `/etc/nginx/conf.d/default.conf`），找到原先的 `server` 块，把 `listen` 改掉，同时加入前面创建的配置文件
+
+```text
+server {
+    listen 443 ssl;
+    include /etc/nginx/snippets/self-signed.conf;
+    include /etc/nginx/snippets/ssl-params.conf;
+
+...
+}
+```
+
+这样当浏览器以 https 协议访问服务器 IP 的时候，就会由这个 `server` 块响应（SSL 是 443 端口处理）。
+
+重新加载 nginx
+
+```sh
+sudo systemctl reload nginx
+```
+
+此时去浏览器访问 https://[ip]，可能会弹出不认识此证书的警告，但是没关系，接受之后就可以看到网站连接是安全的。
+
+但是此时访问 http://[ip] 是没有响应的，因为没有 `server` 块响应 80 端口的访问。如果我们想把 http 的访问都自动转成 https 的访问，可以再添加一个 `server` 块，填入如下内容
+
+```text
+server {
+    listen 80;
+    server_name [ip];
+
+    return 302 https://$server_name$request_uri;
+}
+```
+
+其中 [ip] 的部分要填入自己服务器的 IP 地址，如果是有域名的话就填域名，总之这个就是下面的 `return` 里的 `$server_name` 要用到的值。
+
+这个块就是把 http 的请求都跳转为 https 的请求了。
+
+此时浏览器访问 http://[ip] 应该就会看到自动跳转为 https://[ip] 了。
+
+# 安装 Wordpress
+
+> 参考 https://www.digitalocean.com/community/tutorials/how-to-install-wordpress-with-lemp-on-ubuntu-22-04
+
+## 为 Wordpress 创建数据库
+
+进入数据库
+
+```sh
+sudo mysql
+```
+
+创建一个新的数据库，这个名字无所谓，不过这里就用简单的 `wordpress` 了
+
+```sql
+CREATE DATABASE wordpress DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci;
+```
+
+为 Wordpress 创建一个新的用户来操作这个数据库，
+
+```sql
+-- 用户名无所谓，这里用 wordpressuser
+CREATE USER 'wordpressuser'@'localhost' IDENTIFIED BY '123456';
+-- 授权
+GRANT ALL ON wordpress.* TO 'wordpressuser'@'localhost';
+```
+
+退出数据库。
+
+## 安装额外的 PHP 扩展
+
+据说这些是 Wordpress 要用的
+
+```sh
+sudo apt install php-curl php-gd php-intl php-mbstring php-soap php-xml php-xmlrpc php-zip
+```
+
+重启服务
+
+```sh
+sudo systemctl restart php8.1-fpm
+```
+
+## 配置 nginx
+
+前面我们在 `/etc/nginx/conf.d/default.conf` 中添加了自签名证书，这次我们还把这个文件当作 wordpress 的主配置文件。
+
+在响应 443 的 `server` 中添加如下内容
+
+```text
+server {
+...
+    location = /favicon.ico { log_not_found off; access_log off; }
+    location = /robots.txt { log_not_found off; access_log off; allow all; }
+    location ~* \.(css|gif|ico|jpeg|jpg|js|png)$ {
+        expires max;
+        log_not_found off;
+    }
+...
+}
+```
+
+简单的 `location`，设置了一些文件不记录日志。因为这些 `location` 里都没有 `root` 和 `index`，因此要在 `server` 内声明 `root` 和 `index`，防止找不到 css 和 js 文件。
+
+然后在 `location /` 中添加这一行
+
+```text
+server {
+...
+    location / {
+        ...
+        try_files $uri $uri/ /index.php$is_args$args;
+    }
+...
+}
+```
+
+重新加载服务
+
+```sh
+sudo systemctl reload nginx
+```
+
+## 下载 Wordpress
+
+运行如下命令
+
+```sh
+cd /tmp
+curl -LO https://wordpress.org/latest.tar.gz
+tar zxf latest.tar.gz
+cp /tmp/wordpress/wp-config-sample.php /tmp/wordpress/wp-config.php
+sudo cp -a /tmp/wordpress/. /usr/share/nginx/html/
+sudo chown -R nginx:nginx /usr/share/nginx/html
+```
+
+这里我们还是用默认的 `/etc/share/nginx/html` 目录作为主目录，然后修改一下它的权限以便 nginx 可以读取并修改里面的文件。
+
+## 设置 Wordpress 配置文件
+
+首先需要一些密钥，执行如下命令获取一些密钥
+
+```sh
+curl -s https://api.wordpress.org/secret-key/1.1/salt/
+```
+
+然后打开 `/usr/share/nginx/html/wp-config.php` 文件，找到类似
+
+```text
+...
+define('AUTH_KEY',         'put your unique phrase here');
+define('SECURE_AUTH_KEY',  'put your unique phrase here');
+define('LOGGED_IN_KEY',    'put your unique phrase here');
+define('NONCE_KEY',        'put your unique phrase here');
+define('AUTH_SALT',        'put your unique phrase here');
+define('SECURE_AUTH_SALT', 'put your unique phrase here');
+define('LOGGED_IN_SALT',   'put your unique phrase here');
+define('NONCE_SALT',       'put your unique phrase here');
+...
+```
+
+的位置，然后把新生成的密钥替换进去。
+
+下面在同一个文件修改一下数据库的设置（文件开头）
+
+```text
+define( 'DB_NAME', 'wordpress' );
+
+define( 'DB_USER', 'wordpressuser' );
+
+define( 'DB_PASSWORD', '123456' );
+
+...
+define('FS_METHOD', 'direct');
+```
+
+最后一行是写入文件系统的方式，设置为直接写入。
+
+## 在浏览器里进行最后的配置
+
+浏览器访问 https://[ip]/wordpress，看到正常的注册页面，就算成功了。
