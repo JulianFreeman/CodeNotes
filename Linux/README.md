@@ -17,3 +17,7 @@ https://linuxize.com/post/how-to-set-or-change-timezone-in-linux/ 的翻译。
 # lnmp_installation_notes
 
 LNMP + Wordpress 安装笔记
+
+# ssh_config_notes
+
+一些 ssh 服务端和客户端的配置笔记
