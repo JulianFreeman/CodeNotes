@@ -21,3 +21,11 @@ LNMP + Wordpress 安装笔记
 # ssh_config_notes
 
 一些 ssh 服务端和客户端的配置笔记
+
+# yaml_syntax
+
+YAML 语法笔记
+
+# netplan_notes
+
+netplan 配置笔记
