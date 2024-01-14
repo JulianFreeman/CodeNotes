@@ -29,3 +29,7 @@ YAML 语法笔记
 # netplan_notes
 
 netplan 配置笔记
+
+# ansible_learning_notes
+
+参考 骏马金龙。
